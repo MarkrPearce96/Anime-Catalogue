@@ -16,15 +16,19 @@ const fs   = require('fs');
 const path = require('path');
 
 const { initOfflineDb }    = require('../src/mapping/offlineDb');
+const { initFribbDb, getTmdbId } = require('../src/mapping/fribbDb');
 const { resolveStremioId } = require('../src/mapping/idMapper');
-const { queryPage, queryMedia } = require('../src/anilist/client');
+const { queryPage }        = require('../src/anilist/client');
 const {
   TRENDING_QUERY, SEASON_QUERY, POPULAR_QUERY,
-  AZ_QUERY, GENRE_QUERY, MEDIA_BY_ID_QUERY
+  AZ_QUERY, GENRE_QUERY
 } = require('../src/anilist/queries');
 const { buildMetaPreview, buildFullMeta, getCurrentSeason } = require('../src/utils/anilistToMeta');
+const { fetchTmdbSeries, fetchTmdbAllEpisodes, buildMetaFromTmdb } = require('../src/tmdb/client');
 const manifest = require('../src/manifest');
 const logger   = require('../src/utils/logger');
+
+const TMDB_API_KEY = process.env.TMDB_API_KEY;
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -56,7 +60,6 @@ function metaFilePath(type, id) {
   return path.join(DIST, 'meta', type, `${id}.json`);
 }
 
-// sleep to avoid hammering AniList (rate limit: ~90 req/min)
 function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
 }
@@ -122,16 +125,40 @@ async function buildCatalog(config, allMediaMap) {
 }
 
 /**
- * Pre-generate meta JSON for every ID encountered in catalogs (kitsu: and anilist:).
+ * Pre-generate meta JSON for every catalog item.
+ * Uses TMDB (episodes + thumbnails) when available, falls back to AniList.
  */
-async function buildAnilistMetas(allMediaMap) {
-  let count = 0;
+async function buildAllMetas(allMediaMap) {
+  let tmdbCount = 0;
+  let fallbackCount = 0;
+
   for (const [stremioId, { media, type }] of allMediaMap) {
+    const anilistId = media.id;
+    const tmdbId    = TMDB_API_KEY ? getTmdbId(anilistId) : null;
+
+    if (tmdbId) {
+      try {
+        const series = await fetchTmdbSeries(tmdbId);
+        if (series) {
+          const episodes = await fetchTmdbAllEpisodes(tmdbId, series.number_of_seasons || 1);
+          const meta = buildMetaFromTmdb(series, episodes, stremioId);
+          writeJson(metaFilePath(type, stremioId), { meta });
+          tmdbCount++;
+          await sleep(150); // respect TMDB rate limit
+          continue;
+        }
+      } catch (err) {
+        logger.warn(`  TMDB fetch failed for ${stremioId} (tmdbId: ${tmdbId}): ${err.message}`);
+      }
+    }
+
+    // Fallback: AniList data (no episode list)
     const meta = buildFullMeta(media, stremioId);
     writeJson(metaFilePath(type, stremioId), { meta });
-    count++;
+    fallbackCount++;
   }
-  logger.info(`  pre-generated ${count} meta files`);
+
+  logger.info(`  meta files: ${tmdbCount} from TMDB, ${fallbackCount} from AniList fallback`);
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -139,8 +166,15 @@ async function buildAnilistMetas(allMediaMap) {
 async function main() {
   logger.info('Build started');
 
-  // 1. Load ID mapping database
+  // 1. Load ID mapping databases
   await initOfflineDb();
+  await initFribbDb();
+
+  if (TMDB_API_KEY) {
+    logger.info('TMDB API key found — meta will use TMDB episodes + thumbnails');
+  } else {
+    logger.warn('TMDB_API_KEY not set — meta will fall back to AniList only (no episodes)');
+  }
 
   // 2. Clean dist
   if (fs.existsSync(DIST)) fs.rmSync(DIST, { recursive: true });
@@ -184,7 +218,11 @@ async function main() {
     }
   }
 
-  // 6. Summary
+  // 6. Build meta files
+  logger.info('Building meta files...');
+  await buildAllMetas(allMediaMap);
+
+  // 7. Summary
   const fileCount = countFiles(DIST);
   logger.info(`Build complete — ${fileCount} files written to dist/${failures ? ` (${failures} catalogs skipped due to errors)` : ''}`);
 }

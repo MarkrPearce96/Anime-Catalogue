@@ -1,5 +1,6 @@
 node_modules/
 data/anime-offline-database.json
+data/anime-list-full.json
 dist/
 .env
 *.log

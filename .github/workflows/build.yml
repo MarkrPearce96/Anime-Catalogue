@@ -1,15 +1,10 @@
 name: Build & Deploy to GitHub Pages
 
 on:
-  # Run on every push to main
   push:
     branches: [main]
-
-  # Scheduled refreshes
   schedule:
-    - cron: '0 * * * *'   # every hour (keeps trending fresh)
-
-  # Allow manual trigger from Actions tab
+    - cron: '0 * * * *'   # every hour
   workflow_dispatch:
 
 permissions:
@@ -17,7 +12,6 @@ permissions:
   pages: write
   id-token: write
 
-# Only allow one deploy at a time; don't cancel in-progress runs
 concurrency:
   group: pages
   cancel-in-progress: false
@@ -39,7 +33,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Cache the offline DB between runs — it only updates weekly
+      - name: Get week number (for cache keys)
+        id: date
+        run: echo "week=$(date +%Y-%V)" >> $GITHUB_OUTPUT
+
+      # Cache both mapping databases — they update weekly
       - name: Cache anime-offline-database
         uses: actions/cache@v4
         with:
@@ -47,12 +45,17 @@ jobs:
           key: offline-db-${{ steps.date.outputs.week }}
           restore-keys: offline-db-
 
-      - name: Get week number (for cache key)
-        id: date
-        run: echo "week=$(date +%Y-%V)" >> $GITHUB_OUTPUT
+      - name: Cache Fribb anime-list
+        uses: actions/cache@v4
+        with:
+          path: data/anime-list-full.json
+          key: fribb-db-${{ steps.date.outputs.week }}
+          restore-keys: fribb-db-
 
       - name: Build static files
         run: node scripts/build.js
+        env:
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
