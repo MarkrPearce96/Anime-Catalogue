@@ -112,11 +112,9 @@ async function buildCatalog(config, allMediaMap) {
 
     const metas = await buildCatalogPage(query, vars, type, catalogId, extraKey);
 
-    // collect anilist: IDs for meta pre-generation
+    // collect all IDs for meta pre-generation (kitsu: and anilist:)
     for (const { media, stremioId } of metas) {
-      if (stremioId.startsWith('anilist:')) {
-        allMediaMap.set(stremioId, { media, type });
-      }
+      allMediaMap.set(stremioId, { media, type });
     }
 
     await sleep(800); // ~75 req/min — comfortably within AniList limit
@@ -124,7 +122,7 @@ async function buildCatalog(config, allMediaMap) {
 }
 
 /**
- * Pre-generate meta JSON for every anilist: ID encountered in catalogs.
+ * Pre-generate meta JSON for every ID encountered in catalogs (kitsu: and anilist:).
  */
 async function buildAnilistMetas(allMediaMap) {
   let count = 0;
@@ -133,7 +131,7 @@ async function buildAnilistMetas(allMediaMap) {
     writeJson(metaFilePath(type, stremioId), { meta });
     count++;
   }
-  logger.info(`  pre-generated ${count} anilist: meta files`);
+  logger.info(`  pre-generated ${count} meta files`);
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -186,8 +184,8 @@ async function main() {
     }
   }
 
-  // 6. Pre-generate anilist: meta files
-  logger.info('Building anilist: meta files');
+  // 6. Pre-generate meta files for all catalog items
+  logger.info('Building meta files');
   await buildAnilistMetas(allMediaMap);
 
   // 7. Summary
