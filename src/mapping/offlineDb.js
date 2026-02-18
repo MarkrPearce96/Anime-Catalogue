@@ -10,6 +10,8 @@ const DB_PATH = path.join(__dirname, '../../data/anime-offline-database.json');
 
 // Map<anilistId (number), kitsuId (string numeric)>
 const anilistToKitsu = new Map();
+// Map<kitsuId (string numeric), anilistId (number)>
+const kitsuToAnilist = new Map();
 
 /**
  * Extract a numeric ID from a source URL.
@@ -26,6 +28,7 @@ function extractId(url, domain) {
  */
 function parseDatabase(json) {
   anilistToKitsu.clear();
+  kitsuToAnilist.clear();
 
   const entries = json.data || json;
   if (!Array.isArray(entries)) {
@@ -50,6 +53,7 @@ function parseDatabase(json) {
 
     if (anilistId && kitsuId) {
       anilistToKitsu.set(Number(anilistId), kitsuId);
+      kitsuToAnilist.set(kitsuId, Number(anilistId));
     }
   }
 
@@ -119,4 +123,13 @@ function getKitsuId(anilistId) {
   return anilistToKitsu.get(Number(anilistId)) || null;
 }
 
-module.exports = { initOfflineDb, refreshOfflineDb, getKitsuId };
+/**
+ * Reverse lookup — Kitsu numeric ID → AniList integer ID.
+ * @param {string} kitsuId  numeric string
+ * @returns {number|null}
+ */
+function getAnilistId(kitsuId) {
+  return kitsuToAnilist.get(String(kitsuId)) || null;
+}
+
+module.exports = { initOfflineDb, refreshOfflineDb, getKitsuId, getAnilistId };

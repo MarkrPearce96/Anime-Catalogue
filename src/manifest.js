@@ -5,8 +5,9 @@ const manifest = {
   version: '1.0.0',
   name: 'Anime Catalogue',
   description: 'Trending, seasonal, and popular anime from AniList.',
-  resources: ['catalog'],
+  resources: ['catalog', 'meta'],
   types: ['series', 'movie'],
+  idPrefixes: ['kitsu:', 'anilist:'],
   catalogs: [
     {
       type: 'series',

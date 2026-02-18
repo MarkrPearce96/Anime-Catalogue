@@ -151,11 +151,46 @@ function buildFullMeta(media, stremioId) {
   return meta;
 }
 
+/**
+ * Convert Kitsu episode objects into a Stremio videos array.
+ *
+ * @param {Array}  kitsuEpisodes - raw objects from fetchKitsuEpisodes()
+ * @param {string} stremioId     - e.g. "kitsu:47759"
+ * @returns {Array}
+ */
+function buildVideosFromKitsuEpisodes(kitsuEpisodes, stremioId) {
+  if (!kitsuEpisodes || kitsuEpisodes.length === 0) return [];
+
+  return kitsuEpisodes
+    .filter(ep => ep.number != null)
+    .map(ep => {
+      const epNum   = ep.number;
+      const season  = ep.seasonNumber || 1;
+      const title   = ep.canonicalTitle || ep.titles && (ep.titles.en_jp || ep.titles.en) || `Episode ${epNum}`;
+      const thumb   = ep.thumbnail && ep.thumbnail.original;
+      const airdate = ep.airdate ? new Date(ep.airdate).toISOString() : undefined;
+
+      const video = {
+        id:       `${stremioId}:${season}:${epNum}`,
+        title,
+        season,
+        episode:  epNum,
+        released: airdate
+      };
+
+      if (thumb) video.thumbnail = thumb;
+      if (ep.description) video.overview = ep.description;
+
+      return video;
+    });
+}
+
 module.exports = {
   getCurrentSeason,
   anilistFormatToStremioType,
   buildMetaPreview,
   buildFullMeta,
+  buildVideosFromKitsuEpisodes,
   getTitle,
   stripHtml
 };
