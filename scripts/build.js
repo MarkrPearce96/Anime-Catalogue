@@ -168,7 +168,7 @@ async function main() {
   ];
 
   // 5. Build each catalog
-  const allMediaMap = new Map(); // stremioId → { media, type }
+  const allMediaMap = new Map(); // stremioId → { media, type } (kept for future use)
   let failures = 0;
 
   for (const config of catalogConfigs) {
@@ -184,11 +184,7 @@ async function main() {
     }
   }
 
-  // 6. Pre-generate meta files for all catalog items
-  logger.info('Building meta files');
-  await buildAnilistMetas(allMediaMap);
-
-  // 7. Summary
+  // 6. Summary
   const fileCount = countFiles(DIST);
   logger.info(`Build complete — ${fileCount} files written to dist/${failures ? ` (${failures} catalogs skipped due to errors)` : ''}`);
 }
