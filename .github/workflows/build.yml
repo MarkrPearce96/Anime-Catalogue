@@ -1,0 +1,72 @@
+name: Build & Deploy to GitHub Pages
+
+on:
+  # Run on every push to main
+  push:
+    branches: [main]
+
+  # Scheduled refreshes
+  schedule:
+    - cron: '0 * * * *'   # every hour (keeps trending fresh)
+
+  # Allow manual trigger from Actions tab
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only allow one deploy at a time; don't cancel in-progress runs
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Cache the offline DB between runs — it only updates weekly
+      - name: Cache anime-offline-database
+        uses: actions/cache@v4
+        with:
+          path: data/anime-offline-database.json
+          key: offline-db-${{ steps.date.outputs.week }}
+          restore-keys: offline-db-
+
+      - name: Get week number (for cache key)
+        id: date
+        run: echo "week=$(date +%Y-%V)" >> $GITHUB_OUTPUT
+
+      - name: Build static files
+        run: node scripts/build.js
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
