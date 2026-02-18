@@ -40,6 +40,14 @@ async function anilistQuery(query, variables = {}) {
       continue;
     }
 
+    // Retry transient server errors with backoff
+    if (res.status >= 500) {
+      const wait = attempt * 10;
+      logger.warn(`AniList server error ${res.status}. Waiting ${wait}s (attempt ${attempt}/3)`);
+      await sleep(wait * 1000);
+      continue;
+    }
+
     if (!res.ok) {
       const text = await res.text();
       throw new Error(`AniList API error ${res.status}: ${text}`);

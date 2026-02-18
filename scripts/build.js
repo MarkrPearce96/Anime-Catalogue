@@ -171,13 +171,19 @@ async function main() {
 
   // 5. Build each catalog
   const allMediaMap = new Map(); // stremioId → { media, type }
+  let failures = 0;
 
   for (const config of catalogConfigs) {
     const label = config.genreLabel
       ? `anilist-discover (${config.genreLabel})`
       : config.catalogId;
     logger.info(`Building catalog: ${label}`);
-    await buildCatalog(config, allMediaMap);
+    try {
+      await buildCatalog(config, allMediaMap);
+    } catch (err) {
+      logger.warn(`  skipped ${label}: ${err.message}`);
+      failures++;
+    }
   }
 
   // 6. Pre-generate anilist: meta files
@@ -186,7 +192,7 @@ async function main() {
 
   // 7. Summary
   const fileCount = countFiles(DIST);
-  logger.info(`Build complete — ${fileCount} files written to dist/`);
+  logger.info(`Build complete — ${fileCount} files written to dist/${failures ? ` (${failures} catalogs skipped due to errors)` : ''}`);
 }
 
 function countFiles(dir) {
