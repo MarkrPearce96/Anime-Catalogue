@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: anime-catalogue-addon
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /manifest.json
+    envVars:
+      - key: NODE_ENV
+        value: production

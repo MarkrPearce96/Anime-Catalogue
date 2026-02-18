@@ -80,7 +80,7 @@ async function initOfflineDb() {
   if (fs.existsSync(DB_PATH)) {
     const stat = fs.statSync(DB_PATH);
     const ageMs = Date.now() - stat.mtimeMs;
-    if (ageMs < 24 * 60 * 60 * 1000) {
+    if (ageMs < 7 * 24 * 60 * 60 * 1000) {
       logger.info('offlineDb: loading from disk cache');
       try {
         json = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
