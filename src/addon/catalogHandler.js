@@ -1,0 +1,133 @@
+'use strict';
+
+const { queryPage } = require('../anilist/client');
+const {
+  TRENDING_QUERY,
+  SEASON_QUERY,
+  POPULAR_QUERY,
+  AZ_QUERY,
+  GENRE_QUERY
+} = require('../anilist/queries');
+const { resolveStremioId } = require('../mapping/idMapper');
+const { buildMetaPreview, getCurrentSeason } = require('../utils/anilistToMeta');
+const memCache = require('../cache/memCache');
+const logger = require('../utils/logger');
+
+// TTL constants (seconds)
+const TTL = {
+  'anilist-trending': 60 * 60,        // 1 hour
+  'anilist-season':   6 * 60 * 60,    // 6 hours
+  'anilist-popular':  12 * 60 * 60,   // 12 hours
+  'anilist-az':       24 * 60 * 60,   // 24 hours
+  'anilist-discover': 6 * 60 * 60     // 6 hours
+};
+
+/**
+ * Convert skip (Stremio offset) to AniList page number.
+ * Stremio sends skip=0, 100, 200 … AniList uses page=1, 2, 3 …
+ */
+function skipToPage(skip) {
+  const s = parseInt(skip, 10) || 0;
+  return Math.floor(s / 100) + 1;
+}
+
+/**
+ * Build the AniList query variables for a given catalog + extras.
+ */
+function buildVariables(catalogId, extra, page) {
+  const vars = { page, perPage: 100 };
+
+  if (catalogId === 'anilist-season') {
+    const { season, year } = getCurrentSeason();
+    vars.season = season;
+    vars.seasonYear = year;
+  }
+
+  if (catalogId === 'anilist-discover' && extra && extra.genre) {
+    vars.genre = extra.genre;
+  }
+
+  return vars;
+}
+
+/**
+ * Choose the right AniList query for a catalog ID.
+ */
+function pickQuery(catalogId) {
+  switch (catalogId) {
+    case 'anilist-trending': return TRENDING_QUERY;
+    case 'anilist-season':   return SEASON_QUERY;
+    case 'anilist-popular':  return POPULAR_QUERY;
+    case 'anilist-az':       return AZ_QUERY;
+    case 'anilist-discover': return GENRE_QUERY;
+    default: return null;
+  }
+}
+
+/**
+ * Fetch a catalog page — checks cache first, queries AniList on miss.
+ *
+ * @param {string} catalogId
+ * @param {object} extra  - { skip?, genre? }
+ * @returns {Promise<{ metas, cacheMaxAge, staleRevalidate, staleError }>}
+ */
+async function fetchCatalog(catalogId, extra = {}) {
+  const page = skipToPage(extra.skip);
+  const genre = extra.genre || '';
+  const cacheKey = `catalog:${catalogId}:${page}:${genre}`;
+  const ttl = TTL[catalogId] || 3600;
+
+  // Cache hit
+  const cached = memCache.get(cacheKey);
+  if (cached) {
+    logger.info(`catalog cache hit: ${cacheKey}`);
+    return cached;
+  }
+
+  logger.info(`catalog cache miss: ${cacheKey} — querying AniList`);
+
+  const query = pickQuery(catalogId);
+  if (!query) {
+    logger.warn(`Unknown catalog ID: ${catalogId}`);
+    return { metas: [] };
+  }
+
+  const vars = buildVariables(catalogId, extra, page);
+  const pageData = await queryPage(query, vars);
+  const mediaList = (pageData && pageData.media) || [];
+
+  // Resolve all IDs concurrently
+  const metas = await Promise.all(
+    mediaList.map(async media => {
+      const stremioId = await resolveStremioId(media);
+      return buildMetaPreview(media, stremioId);
+    })
+  );
+
+  const result = {
+    metas,
+    cacheMaxAge: ttl,
+    staleRevalidate: ttl * 2,
+    staleError: 86400
+  };
+
+  memCache.set(cacheKey, result, ttl);
+  return result;
+}
+
+/**
+ * Register the catalog handler on a stremio-addon-sdk builder.
+ * @param {object} builder
+ */
+function defineCatalogHandler(builder) {
+  builder.defineCatalogHandler(async ({ type, id, extra }) => {
+    try {
+      return await fetchCatalog(id, extra || {});
+    } catch (err) {
+      logger.error(`catalogHandler error [${id}]:`, err.message);
+      return { metas: [] };
+    }
+  });
+}
+
+module.exports = { defineCatalogHandler, fetchCatalog };

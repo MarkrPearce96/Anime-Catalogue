@@ -1,0 +1,4 @@
+node_modules/
+data/anime-offline-database.json
+.env
+*.log

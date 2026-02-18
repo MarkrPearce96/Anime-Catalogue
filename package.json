@@ -1,0 +1,16 @@
+{
+  "name": "anime-catalogue-addon",
+  "version": "1.0.0",
+  "description": "Stremio addon surfacing AniList anime catalogs",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "stremio-addon-sdk": "^1.6.10",
+    "node-fetch": "^2.7.0"
+  },
+  "engines": {
+    "node": ">=14"
+  }
+}
