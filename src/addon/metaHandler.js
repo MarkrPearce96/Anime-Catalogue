@@ -4,7 +4,7 @@ const { queryMedia }    = require('../anilist/client');
 const { MEDIA_BY_ID_QUERY } = require('../anilist/queries');
 const { buildFullMeta, buildVideosFromKitsuEpisodes } = require('../utils/anilistToMeta');
 const { fetchKitsuEpisodes } = require('../kitsu/client');
-const { fetchTmdbSeries, fetchTmdbAllEpisodes, buildMetaFromTmdb } = require('../tmdb/client');
+const { fetchTmdbSeries, fetchTmdbAllEpisodes, fetchTmdbExternalIds, buildMetaFromTmdb } = require('../tmdb/client');
 const { getAnilistId, getKitsuId } = require('../mapping/offlineDb');
 const { getTmdbId }     = require('../mapping/fribbDb');
 const memCache          = require('../cache/memCache');
@@ -49,13 +49,18 @@ async function fetchMeta(id) {
 
   if (tmdbId && process.env.TMDB_API_KEY) {
     try {
-      const series = await fetchTmdbSeries(tmdbId);
+      // Fetch series details and external IDs (for IMDB ID) in parallel
+      const [series, externalIds] = await Promise.all([
+        fetchTmdbSeries(tmdbId),
+        fetchTmdbExternalIds(tmdbId),
+      ]);
       if (series) {
+        const imdbId  = (externalIds && externalIds.imdb_id) || null;
         const episodes = await fetchTmdbAllEpisodes(tmdbId, series.number_of_seasons || 1);
-        const meta = buildMetaFromTmdb(series, episodes, id);
+        const meta = buildMetaFromTmdb(series, episodes, id, imdbId);
         const result = { meta, cacheMaxAge: META_TTL, staleRevalidate: META_TTL * 2, staleError: 86400 };
         memCache.set(cacheKey, result, META_TTL);
-        logger.info(`  meta sourced from TMDB (tmdbId: ${tmdbId})`);
+        logger.info(`  meta sourced from TMDB (tmdbId: ${tmdbId}${imdbId ? ', imdbId: ' + imdbId : ''})`);
         return result;
       }
     } catch (err) {

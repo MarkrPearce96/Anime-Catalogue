@@ -24,7 +24,7 @@ const {
   AZ_QUERY, GENRE_QUERY
 } = require('../src/anilist/queries');
 const { buildMetaPreview, buildFullMeta, getCurrentSeason } = require('../src/utils/anilistToMeta');
-const { fetchTmdbSeries, fetchTmdbAllEpisodes, buildMetaFromTmdb } = require('../src/tmdb/client');
+const { fetchTmdbSeries, fetchTmdbAllEpisodes, fetchTmdbExternalIds, buildMetaFromTmdb } = require('../src/tmdb/client');
 const manifest = require('../src/manifest');
 const logger   = require('../src/utils/logger');
 
@@ -138,10 +138,15 @@ async function buildAllMetas(allMediaMap) {
 
     if (tmdbId) {
       try {
-        const series = await fetchTmdbSeries(tmdbId);
+        // Fetch series details and external IDs in parallel
+        const [series, externalIds] = await Promise.all([
+          fetchTmdbSeries(tmdbId),
+          fetchTmdbExternalIds(tmdbId),
+        ]);
         if (series) {
+          const imdbId  = (externalIds && externalIds.imdb_id) || null;
           const episodes = await fetchTmdbAllEpisodes(tmdbId, series.number_of_seasons || 1);
-          const meta = buildMetaFromTmdb(series, episodes, stremioId);
+          const meta = buildMetaFromTmdb(series, episodes, stremioId, imdbId);
           writeJson(metaFilePath(type, stremioId), { meta });
           tmdbCount++;
           await sleep(150); // respect TMDB rate limit

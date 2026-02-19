@@ -67,14 +67,27 @@ async function fetchTmdbAllEpisodes(tmdbId, numSeasons) {
 }
 
 /**
+ * Fetch external IDs (IMDB, TVDB, etc.) for a TMDB TV series.
+ * Returns null on error. imdb_id may be null if the show isn't on IMDB.
+ */
+async function fetchTmdbExternalIds(tmdbId) {
+  const url = `${TMDB_API}/tv/${tmdbId}/external_ids?api_key=${apiKey()}`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  return res.json();
+}
+
+/**
  * Build a Stremio meta object from a TMDB series + episodes.
  *
- * @param {object} series      - TMDB /tv/{id} response
- * @param {Array}  allEpisodes - flat array from fetchTmdbAllEpisodes()
- * @param {string} stremioId   - e.g. "kitsu:47759"
+ * @param {object}      series      - TMDB /tv/{id} response
+ * @param {Array}       allEpisodes - flat array from fetchTmdbAllEpisodes()
+ * @param {string}      stremioId   - e.g. "kitsu:47759"
+ * @param {string|null} imdbId      - e.g. "tt0944947" — when provided, video IDs use IMDB format
+ *                                    so Torrentio routes streams via its IMDB path (better coverage)
  * @returns {object}
  */
-function buildMetaFromTmdb(series, allEpisodes, stremioId) {
+function buildMetaFromTmdb(series, allEpisodes, stremioId, imdbId) {
   const statusMap = {
     'Returning Series': 'Continuing',
     'Ended':            'Ended',
@@ -94,6 +107,9 @@ function buildMetaFromTmdb(series, allEpisodes, stremioId) {
     status:      statusMap[series.status] || series.status || undefined,
   };
 
+  // Include IMDB ID so Stremio and stream addons can cross-reference
+  if (imdbId) meta.imdbId = imdbId;
+
   if (series.vote_average) {
     meta.imdbRating = series.vote_average.toFixed(1);
   }
@@ -108,12 +124,17 @@ function buildMetaFromTmdb(series, allEpisodes, stremioId) {
   const runtime = series.episode_run_time && series.episode_run_time[0];
   if (runtime) meta.runtime = `${runtime} min`;
 
-  // Build videos array
+  // Build videos array.
+  // Use IMDB ID as the video ID base when available — this routes stream requests
+  // through Torrentio's IMDB path (far better coverage than its kitsu: path).
+  // Format: "tt0944947:1:1"  vs fallback "kitsu:47759:1:1"
+  const videoBase = imdbId || stremioId;
+
   meta.videos = allEpisodes
     .filter(ep => ep.episode_number != null)
     .map(ep => {
       const video = {
-        id:      `${stremioId}:${ep.season_number}:${ep.episode_number}`,
+        id:      `${videoBase}:${ep.season_number}:${ep.episode_number}`,
         title:   ep.name || `Episode ${ep.episode_number}`,
         season:  ep.season_number,
         episode: ep.episode_number,
@@ -131,5 +152,6 @@ module.exports = {
   fetchTmdbSeries,
   fetchTmdbSeason,
   fetchTmdbAllEpisodes,
+  fetchTmdbExternalIds,
   buildMetaFromTmdb,
 };
