@@ -215,6 +215,54 @@ async function buildAllMetas(allMediaMap) {
   logger.info(`  meta files: ${tmdbCount} from TMDB, ${fallbackCount} from AniList fallback, ${skippedCount} skipped (cached)`);
 }
 
+// ─── None-genre aliases ───────────────────────────────────────────────────────
+
+/**
+ * Create genre=None alias files by copying existing single-filter files.
+ * No extra API calls — just file copies so Stremio can request genre=None&year=X etc.
+ * Keys are alphabetically sorted to match Stremio's URL encoding.
+ */
+function createNoneAliases() {
+  function alias(src, dst) {
+    if (fs.existsSync(src)) {
+      fs.mkdirSync(path.dirname(dst), { recursive: true });
+      fs.copyFileSync(src, dst);
+    }
+  }
+
+  // genre=None alone → base catalog
+  alias(
+    catalogFilePath('anime', 'anilist-anime', undefined),
+    catalogFilePath('anime', 'anilist-anime', 'genre=None')
+  );
+
+  // genre=None + format  (sorted: format < genre)
+  for (const { display } of ANIME_FORMATS) {
+    alias(
+      catalogFilePath('anime', 'anilist-anime', `format=${display}`),
+      catalogFilePath('anime', 'anilist-anime', `format=${display}&genre=None`)
+    );
+  }
+
+  // genre=None + status  (sorted: genre < status)
+  for (const { display } of ANIME_STATUSES) {
+    alias(
+      catalogFilePath('anime', 'anilist-anime', `status=${display}`),
+      catalogFilePath('anime', 'anilist-anime', `genre=None&status=${display}`)
+    );
+  }
+
+  // genre=None + year  (sorted: genre < year)
+  for (const y of ANIME_YEARS) {
+    alias(
+      catalogFilePath('anime', 'anilist-anime', `year=${y}`),
+      catalogFilePath('anime', 'anilist-anime', `genre=None&year=${y}`)
+    );
+  }
+
+  logger.info('  created genre=None alias files');
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -340,11 +388,14 @@ async function main() {
     }
   }
 
-  // 6. Build meta files
+  // 6. Create genre=None alias files (copies of single-filter files, no extra API calls)
+  createNoneAliases();
+
+  // 7. Build meta files
   logger.info('Building meta files...');
   await buildAllMetas(allMediaMap);
 
-  // 7. Summary
+  // 8. Summary
   const fileCount = countFiles(DIST);
   logger.info(`Build complete — ${fileCount} files written to dist/${failures ? ` (${failures} catalogs skipped due to errors)` : ''}`);
 }

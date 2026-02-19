@@ -44,8 +44,9 @@ const manifest = {
       extra: [
         {
           name: 'genre',
-          isRequired: true,
+          isRequired: false,
           options: [
+            'None',
             'Action', 'Adventure', 'Comedy', 'Drama', 'Fantasy', 'Horror',
             'Mahou Shoujo', 'Mecha', 'Music', 'Mystery', 'Psychological',
             'Romance', 'Sci-Fi', 'Slice of Life', 'Sports', 'Supernatural', 'Thriller'

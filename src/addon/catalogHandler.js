@@ -48,7 +48,7 @@ function buildVariables(catalogId, extra, page) {
   }
 
   if (catalogId === 'anilist-anime' && extra) {
-    if (extra.genre)  vars.genre  = extra.genre;
+    if (extra.genre && extra.genre !== 'None') vars.genre  = extra.genre;
     if (extra.format) vars.format = FORMAT_MAP[extra.format] || extra.format;
     if (extra.status) vars.status = STATUS_MAP[extra.status] || extra.status;
     if (extra.year)   vars.year   = parseInt(extra.year, 10);
@@ -80,8 +80,12 @@ function pickQuery(catalogId) {
  */
 async function fetchCatalog(catalogId, extra = {}) {
   const page = skipToPage(extra.skip);
-  const genre = extra.genre || '';
-  const cacheKey = `catalog:${catalogId}:${page}:${genre}`;
+  const extraKey = Object.entries(extra)
+    .filter(([k]) => k !== 'skip')
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k}=${v}`)
+    .join('&');
+  const cacheKey = `catalog:${catalogId}:${page}:${extraKey}`;
   const ttl = TTL[catalogId] || 3600;
 
   // Cache hit
