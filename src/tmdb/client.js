@@ -23,7 +23,8 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
  * Returns null on 404 (not found), throws on other errors.
  */
 async function fetchTmdbSeries(tmdbId) {
-  const url = `${TMDB_API}/tv/${tmdbId}?api_key=${apiKey()}&language=en-US`;
+  // append_to_response fetches credits (cast) and videos (trailers) in the same request
+  const url = `${TMDB_API}/tv/${tmdbId}?api_key=${apiKey()}&language=en-US&append_to_response=credits,videos`;
   const res = await fetch(url);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`TMDB /tv/${tmdbId} returned ${res.status}`);
@@ -44,7 +45,8 @@ async function fetchTmdbSeason(tmdbId, seasonNum) {
 
 /**
  * Fetch all seasons for a series and return a flat episode array.
- * Skips Season 0 (specials) to keep the list clean.
+ * Regular seasons (1-N) come first; Season 0 (specials/OVAs) is appended
+ * at the end so Stremio shows "Special" below the regular seasons in the dropdown.
  *
  * @param {number} tmdbId
  * @param {number} numSeasons  - from series.number_of_seasons
@@ -53,6 +55,7 @@ async function fetchTmdbSeason(tmdbId, seasonNum) {
 async function fetchTmdbAllEpisodes(tmdbId, numSeasons) {
   const allEpisodes = [];
 
+  // Regular seasons first
   for (let s = 1; s <= numSeasons; s++) {
     const season = await fetchTmdbSeason(tmdbId, s);
     if (season && Array.isArray(season.episodes)) {
@@ -61,6 +64,15 @@ async function fetchTmdbAllEpisodes(tmdbId, numSeasons) {
       }
     }
     await sleep(150); // stay well within TMDB rate limit
+  }
+
+  // Season 0 = specials/OVAs — append last so Stremio lists "Special" below Season N
+  const specials = await fetchTmdbSeason(tmdbId, 0);
+  if (specials && Array.isArray(specials.episodes) && specials.episodes.length > 0) {
+    for (const ep of specials.episodes) {
+      allEpisodes.push({ ...ep, season_number: 0 });
+    }
+    await sleep(150);
   }
 
   return allEpisodes;
@@ -109,6 +121,19 @@ function buildMetaFromTmdb(series, allEpisodes, stremioId, imdbId) {
 
   // Include IMDB ID so Stremio and stream addons can cross-reference
   if (imdbId) meta.imdbId = imdbId;
+
+  // Cast — top 10 credited actors (voice cast for anime)
+  if (series.credits && Array.isArray(series.credits.cast) && series.credits.cast.length > 0) {
+    meta.cast = series.credits.cast.slice(0, 10).map(c => c.name);
+  }
+
+  // Trailer — first YouTube trailer from TMDB videos
+  if (series.videos && Array.isArray(series.videos.results)) {
+    const trailer = series.videos.results.find(v => v.site === 'YouTube' && v.type === 'Trailer');
+    if (trailer) {
+      meta.trailers = [{ source: trailer.key, type: 'Trailer' }];
+    }
+  }
 
   if (series.vote_average) {
     meta.imdbRating = series.vote_average.toFixed(1);
