@@ -52,6 +52,13 @@ jobs:
           key: fribb-db-${{ steps.date.outputs.week }}
           restore-keys: fribb-db-
 
+      - name: Cache static dist files
+        uses: actions/cache@v4
+        with:
+          path: dist/
+          key: dist-static-${{ steps.date.outputs.week }}
+          restore-keys: dist-static-
+
       - name: Build static files
         run: node scripts/build.js
         env:
