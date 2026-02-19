@@ -2,7 +2,7 @@
 
 // Year options for the anime discover filter (current year → 2000)
 const currentYear = new Date().getFullYear();
-const YEAR_OPTIONS = Array.from({ length: currentYear - 1979 }, (_, i) => String(currentYear - i));
+const YEAR_OPTIONS = Array.from({ length: currentYear - 1994 }, (_, i) => String(currentYear - i));
 
 const manifest = {
   id: 'com.animecatalogue.stremio',
