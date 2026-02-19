@@ -215,54 +215,6 @@ async function buildAllMetas(allMediaMap) {
   logger.info(`  meta files: ${tmdbCount} from TMDB, ${fallbackCount} from AniList fallback, ${skippedCount} skipped (cached)`);
 }
 
-// ─── None-genre aliases ───────────────────────────────────────────────────────
-
-/**
- * Create genre=All alias files by copying existing single-filter files.
- * No extra API calls — just file copies so Stremio can request genre=All&year=X etc.
- * Keys are alphabetically sorted to match Stremio's URL encoding.
- */
-function createNoneAliases() {
-  function alias(src, dst) {
-    if (fs.existsSync(src)) {
-      fs.mkdirSync(path.dirname(dst), { recursive: true });
-      fs.copyFileSync(src, dst);
-    }
-  }
-
-  // genre=All alone → base catalog
-  alias(
-    catalogFilePath('anime', 'anilist-anime', undefined),
-    catalogFilePath('anime', 'anilist-anime', 'genre=All')
-  );
-
-  // genre=All + format  (sorted: format < genre)
-  for (const { display } of ANIME_FORMATS) {
-    alias(
-      catalogFilePath('anime', 'anilist-anime', `format=${display}`),
-      catalogFilePath('anime', 'anilist-anime', `format=${display}&genre=All`)
-    );
-  }
-
-  // genre=All + status  (sorted: genre < status)
-  for (const { display } of ANIME_STATUSES) {
-    alias(
-      catalogFilePath('anime', 'anilist-anime', `status=${display}`),
-      catalogFilePath('anime', 'anilist-anime', `genre=All&status=${display}`)
-    );
-  }
-
-  // genre=All + year  (sorted: genre < year)
-  for (const y of ANIME_YEARS) {
-    alias(
-      catalogFilePath('anime', 'anilist-anime', `year=${y}`),
-      catalogFilePath('anime', 'anilist-anime', `genre=All&year=${y}`)
-    );
-  }
-
-  logger.info('  created genre=All alias files');
-}
-
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -300,6 +252,11 @@ async function main() {
   writeJson(path.join(DIST, 'manifest.json'), manifest);
   logger.info('  wrote manifest.json');
 
+  // Write empty base catalog — hides the row on the home screen since Stremio
+  // suppresses rows that return empty results.
+  writeJson(path.join(DIST, 'catalog', 'anime', 'anilist-anime.json'), { metas: [] });
+  logger.info('  wrote catalog/anime/anilist-anime.json (empty)');
+
   const { season, year } = getCurrentSeason();
 
   // 4. Define all catalogs to build
@@ -311,8 +268,6 @@ async function main() {
     { catalogId: 'anilist-top',      query: TOP_QUERY, pages: 1 },
 
     // ── Anime discover catalog (type: anime) — one page per filter ─────────────
-    // Default (no filter)
-    { catalogId: 'anilist-anime', type: 'anime', query: ANIME_DISCOVER_QUERY, pages: 1 },
     // Genre
     ...ANIME_GENRES.map(g => ({
       catalogId: 'anilist-anime', type: 'anime', query: ANIME_DISCOVER_QUERY,
@@ -388,10 +343,7 @@ async function main() {
     }
   }
 
-  // 6. Create genre=All alias files (copies of single-filter files, no extra API calls)
-  createNoneAliases();
-
-  // 7. Build meta files
+  // 6. Build meta files
   logger.info('Building meta files...');
   await buildAllMetas(allMediaMap);
 
