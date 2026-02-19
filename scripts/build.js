@@ -95,21 +95,26 @@ async function buildCatalogPage(query, vars, type, catalogId, extraKey) {
  * Build all pages for a single catalog config.
  */
 async function buildCatalog(config, allMediaMap) {
-  const { catalogId, type = 'series', query, baseVars = {}, filterKey, filterValue, pages = PAGES } = config;
+  const { catalogId, type = 'series', query, baseVars = {}, filterKey, filterValue, extraFilters = {}, pages = PAGES } = config;
 
   for (let page = 1; page <= pages; page++) {
     const vars = { ...baseVars, page, perPage: 100 };
 
-    // Build the extra key that matches Stremio's URL path segment:
-    //   no filter, page 1  → undefined            → anilist-trending.json
-    //   no filter, page 2  → "skip=100"           → anilist-trending/skip=100.json
-    //   filter, page 1     → "genre=Action"       → anilist-anime/genre=Action.json
-    //   filter, page 2     → "genre=Action&skip=100"
+    // Build the extra key that matches Stremio's URL path segment.
+    // Keys are sorted alphabetically to match Stremio's encoding for multi-filter URLs.
+    //   no filter, page 1         → undefined                      → anilist-trending.json
+    //   no filter, page 2         → "skip=100"                     → anilist-trending/skip=100.json
+    //   filter, page 1            → "genre=Action"                 → anilist-anime/genre=Action.json
+    //   filter, page 2            → "genre=Action&skip=100"
+    //   multi-filter, page 1      → "format=TV&genre=Action"       → anilist-anime/format=TV&genre=Action.json
     let extraKey;
     if (filterKey && filterValue) {
-      extraKey = page === 1
-        ? `${filterKey}=${filterValue}`
-        : `${filterKey}=${filterValue}&skip=${(page - 1) * 100}`;
+      const params = { [filterKey]: filterValue, ...extraFilters };
+      if (page > 1) params.skip = String((page - 1) * 100);
+      extraKey = Object.entries(params)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([k, v]) => `${k}=${v}`)
+        .join('&');
     } else {
       extraKey = page === 1 ? undefined : `skip=${(page - 1) * 100}`;
     }
@@ -237,6 +242,38 @@ async function main() {
       catalogId: 'anilist-anime', type: 'anime', query: ANIME_DISCOVER_QUERY,
       baseVars: { year: y }, filterKey: 'year', filterValue: String(y), pages: 1
     })),
+
+    // ── Multi-filter combos (genre + one other filter) ─────────────────────────
+    // Genre + Format (17 × 5 = 85 combos) — e.g. format=TV&genre=Action.json
+    ...ANIME_GENRES.flatMap(g =>
+      ANIME_FORMATS.map(({ display, anilist }) => ({
+        catalogId: 'anilist-anime', type: 'anime', query: ANIME_DISCOVER_QUERY,
+        baseVars: { genre: g, format: anilist },
+        filterKey: 'genre', filterValue: g,
+        extraFilters: { format: display },
+        pages: 1
+      }))
+    ),
+    // Genre + Status (17 × 3 = 51 combos) — e.g. genre=Action&status=Airing.json
+    ...ANIME_GENRES.flatMap(g =>
+      ANIME_STATUSES.map(({ display, anilist }) => ({
+        catalogId: 'anilist-anime', type: 'anime', query: ANIME_DISCOVER_QUERY,
+        baseVars: { genre: g, status: anilist },
+        filterKey: 'genre', filterValue: g,
+        extraFilters: { status: display },
+        pages: 1
+      }))
+    ),
+    // Genre + Year (17 × N combos) — e.g. genre=Action&year=2024.json
+    ...ANIME_GENRES.flatMap(g =>
+      ANIME_YEARS.map(y => ({
+        catalogId: 'anilist-anime', type: 'anime', query: ANIME_DISCOVER_QUERY,
+        baseVars: { genre: g, year: y },
+        filterKey: 'genre', filterValue: g,
+        extraFilters: { year: String(y) },
+        pages: 1
+      }))
+    ),
   ];
 
   // 5. Build each catalog
