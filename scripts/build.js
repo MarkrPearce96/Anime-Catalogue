@@ -215,6 +215,36 @@ async function buildAllMetas(allMediaMap) {
   logger.info(`  meta files: ${tmdbCount} from TMDB, ${fallbackCount} from AniList fallback, ${skippedCount} skipped (cached)`);
 }
 
+/**
+ * Create reverse-order alias files for all 2-filter combo catalog files.
+ * Stremio may send extras in non-alphabetical order when a required filter
+ * is auto-selected (e.g. year=2026&genre=Action instead of genre=Action&year=2026).
+ * We create copies under the reversed key order so both URLs resolve.
+ */
+function createReverseOrderAliases() {
+  const dir = path.join(DIST, 'catalog', 'anime', 'anilist-anime');
+  if (!fs.existsSync(dir)) return;
+
+  let count = 0;
+  for (const file of fs.readdirSync(dir)) {
+    if (!file.endsWith('.json')) continue;
+    const name = file.replace('.json', '');
+    const parts = name.split('&');
+    if (parts.length !== 2) continue;
+
+    const reversed = `${parts[1]}&${parts[0]}.json`;
+    const srcPath = path.join(dir, file);
+    const dstPath = path.join(dir, reversed);
+
+    if (!fs.existsSync(dstPath)) {
+      fs.copyFileSync(srcPath, dstPath);
+      count++;
+    }
+  }
+
+  logger.info(`  created ${count} reverse-order alias files`);
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -340,11 +370,15 @@ async function main() {
     }
   }
 
-  // 6. Build meta files
+  // 6. Create reverse-order aliases for multi-filter combos
+  logger.info('Creating reverse-order alias files...');
+  createReverseOrderAliases();
+
+  // 7. Build meta files
   logger.info('Building meta files...');
   await buildAllMetas(allMediaMap);
 
-  // 8. Summary
+  // 9. Summary
   const fileCount = countFiles(DIST);
   logger.info(`Build complete — ${fileCount} files written to dist/${failures ? ` (${failures} catalogs skipped due to errors)` : ''}`);
 }
