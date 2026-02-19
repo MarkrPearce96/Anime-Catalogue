@@ -126,6 +126,19 @@ async function buildCatalog(config, allMediaMap) {
 }
 
 /**
+ * Write a meta file under every applicable type directory.
+ * Anime shows appear in both 'series' and 'anime' catalogs, so Stremio may
+ * request their meta under either type — we write both to avoid 404s.
+ * Movies only need 'movie'.
+ */
+function writeMetaAllTypes(meta, stremioId) {
+  const types = meta.type === 'movie' ? ['movie'] : ['series', 'anime'];
+  for (const t of types) {
+    writeJson(metaFilePath(t, stremioId), { meta });
+  }
+}
+
+/**
  * Pre-generate meta JSON for every catalog item.
  * Uses TMDB (episodes + thumbnails) when available, falls back to AniList.
  */
@@ -149,7 +162,7 @@ async function buildAllMetas(allMediaMap) {
           const imdbId  = (externalIds && externalIds.imdb_id) || null;
           const episodes = await fetchTmdbAllEpisodes(tmdbId, series.number_of_seasons || 1);
           const meta = buildMetaFromTmdb(series, episodes, stremioId, imdbId, aggregateCredits);
-          writeJson(metaFilePath(type, stremioId), { meta });
+          writeMetaAllTypes(meta, stremioId);
           tmdbCount++;
           await sleep(150); // respect TMDB rate limit
           continue;
@@ -161,7 +174,7 @@ async function buildAllMetas(allMediaMap) {
 
     // Fallback: AniList data (no episode list)
     const meta = buildFullMeta(media, stremioId);
-    writeJson(metaFilePath(type, stremioId), { meta });
+    writeMetaAllTypes(meta, stremioId);
     fallbackCount++;
   }
 
