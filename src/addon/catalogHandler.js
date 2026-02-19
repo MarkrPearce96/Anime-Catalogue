@@ -48,8 +48,6 @@ function buildVariables(catalogId, extra, page) {
   }
 
   if (catalogId === 'anilist-anime' && extra) {
-    const hasFilters = extra.genre || extra.format || extra.status || extra.year;
-    if (!hasFilters) return { metas: [], cacheMaxAge: 0, staleRevalidate: 0, staleError: 0 };
     if (extra.genre) vars.genre  = extra.genre;
     if (extra.format) vars.format = FORMAT_MAP[extra.format] || extra.format;
     if (extra.status) vars.status = STATUS_MAP[extra.status] || extra.status;

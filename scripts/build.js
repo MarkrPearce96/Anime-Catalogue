@@ -252,11 +252,6 @@ async function main() {
   writeJson(path.join(DIST, 'manifest.json'), manifest);
   logger.info('  wrote manifest.json');
 
-  // Write empty base catalog — hides the row on the home screen since Stremio
-  // suppresses rows that return empty results.
-  writeJson(path.join(DIST, 'catalog', 'anime', 'anilist-anime.json'), { metas: [] });
-  logger.info('  wrote catalog/anime/anilist-anime.json (empty)');
-
   const { season, year } = getCurrentSeason();
 
   // 4. Define all catalogs to build
@@ -268,6 +263,8 @@ async function main() {
     { catalogId: 'anilist-top',      query: TOP_QUERY, pages: 1 },
 
     // ── Anime discover catalog (type: anime) — one page per filter ─────────────
+    // Default (no filter)
+    { catalogId: 'anilist-anime', type: 'anime', query: ANIME_DISCOVER_QUERY, pages: 1 },
     // Genre
     ...ANIME_GENRES.map(g => ({
       catalogId: 'anilist-anime', type: 'anime', query: ANIME_DISCOVER_QUERY,
