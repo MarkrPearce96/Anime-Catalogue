@@ -61,8 +61,8 @@ function getTitle(title) {
  * @param {string} stremioId - resolved stremio ID (e.g. "kitsu:12345")
  * @returns {object}
  */
-function buildMetaPreview(media, stremioId) {
-  const type = anilistFormatToStremioType(media.format);
+function buildMetaPreview(media, stremioId, overrideType) {
+  const type = overrideType || anilistFormatToStremioType(media.format);
   const name = getTitle(media.title);
 
   const meta = {

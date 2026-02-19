@@ -101,6 +101,20 @@ const TOP_QUERY = `
   }
 `;
 
+const ANIME_DISCOVER_QUERY = `
+  query AnimeDiscover($page: Int, $perPage: Int, $genre: String, $format: MediaFormat, $status: MediaStatus, $year: Int) {
+    Page(page: $page, perPage: $perPage) {
+      pageInfo {
+        hasNextPage
+        total
+      }
+      media(type: ANIME, isAdult: false, sort: POPULARITY_DESC, genre: $genre, format: $format, status: $status, seasonYear: $year) {
+        ${MEDIA_FIELDS}
+      }
+    }
+  }
+`;
+
 const MEDIA_BY_ID_QUERY = `
   query MediaById($id: Int) {
     Media(id: $id, type: ANIME) {
@@ -114,5 +128,6 @@ module.exports = {
   SEASON_QUERY,
   POPULAR_QUERY,
   TOP_QUERY,
+  ANIME_DISCOVER_QUERY,
   MEDIA_BY_ID_QUERY
 };

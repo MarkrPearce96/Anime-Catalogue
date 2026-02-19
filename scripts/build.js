@@ -20,7 +20,7 @@ const { initFribbDb, getTmdbId } = require('../src/mapping/fribbDb');
 const { resolveStremioId } = require('../src/mapping/idMapper');
 const { queryPage }        = require('../src/anilist/client');
 const {
-  TRENDING_QUERY, SEASON_QUERY, POPULAR_QUERY, TOP_QUERY
+  TRENDING_QUERY, SEASON_QUERY, POPULAR_QUERY, TOP_QUERY, ANIME_DISCOVER_QUERY
 } = require('../src/anilist/queries');
 const { buildMetaPreview, buildFullMeta, getCurrentSeason } = require('../src/utils/anilistToMeta');
 const { fetchTmdbSeries, fetchTmdbAllEpisodes, fetchTmdbExternalIds, fetchTmdbAggregateCredits, buildMetaFromTmdb } = require('../src/tmdb/client');
@@ -33,6 +33,13 @@ const TMDB_API_KEY = process.env.TMDB_API_KEY;
 
 const DIST   = path.join(__dirname, '../dist');
 const PAGES  = 3;   // default pages per catalog (100 items/page → 300 items)
+
+// Anime discover filter values
+const ANIME_GENRES  = ['Action','Adventure','Comedy','Drama','Fantasy','Horror','Mahou Shoujo','Mecha','Music','Mystery','Psychological','Romance','Sci-Fi','Slice of Life','Sports','Supernatural','Thriller'];
+const ANIME_FORMATS = [{ display: 'TV', anilist: 'TV' }, { display: 'Movie', anilist: 'MOVIE' }, { display: 'OVA', anilist: 'OVA' }, { display: 'ONA', anilist: 'ONA' }, { display: 'Special', anilist: 'SPECIAL' }];
+const ANIME_STATUSES = [{ display: 'Airing', anilist: 'RELEASING' }, { display: 'Finished', anilist: 'FINISHED' }, { display: 'Upcoming', anilist: 'NOT_YET_RELEASED' }];
+const currentYear   = new Date().getFullYear();
+const ANIME_YEARS   = Array.from({ length: 10 }, (_, i) => currentYear - i);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -67,10 +74,11 @@ async function buildCatalogPage(query, vars, type, catalogId, extraKey) {
   const pageData  = await queryPage(query, vars);
   const mediaList = (pageData && pageData.media) || [];
 
+  const overrideType = type === 'anime' ? 'anime' : undefined;
   const metas = await Promise.all(
     mediaList.map(async media => {
       const stremioId = await resolveStremioId(media);
-      return { meta: buildMetaPreview(media, stremioId), media, stremioId };
+      return { meta: buildMetaPreview(media, stremioId, overrideType), media, stremioId };
     })
   );
 
@@ -87,21 +95,21 @@ async function buildCatalogPage(query, vars, type, catalogId, extraKey) {
  * Build all pages for a single catalog config.
  */
 async function buildCatalog(config, allMediaMap) {
-  const { catalogId, type = 'series', query, baseVars = {}, genreLabel, pages = PAGES } = config;
+  const { catalogId, type = 'series', query, baseVars = {}, filterKey, filterValue, pages = PAGES } = config;
 
   for (let page = 1; page <= pages; page++) {
     const vars = { ...baseVars, page, perPage: 100 };
 
     // Build the extra key that matches Stremio's URL path segment:
-    //   no genre, page 1  → undefined          → anilist-discover.json
-    //   no genre, page 2  → "skip=100"         → anilist-discover/skip=100.json
-    //   genre, page 1     → "genre=Action"     → anilist-discover/genre=Action.json
-    //   genre, page 2     → "genre=Action&skip=100" → anilist-discover/genre=Action&skip=100.json
+    //   no filter, page 1  → undefined            → anilist-trending.json
+    //   no filter, page 2  → "skip=100"           → anilist-trending/skip=100.json
+    //   filter, page 1     → "genre=Action"       → anilist-anime/genre=Action.json
+    //   filter, page 2     → "genre=Action&skip=100"
     let extraKey;
-    if (genreLabel) {
+    if (filterKey && filterValue) {
       extraKey = page === 1
-        ? `genre=${genreLabel}`
-        : `genre=${genreLabel}&skip=${(page - 1) * 100}`;
+        ? `${filterKey}=${filterValue}`
+        : `${filterKey}=${filterValue}&skip=${(page - 1) * 100}`;
     } else {
       extraKey = page === 1 ? undefined : `skip=${(page - 1) * 100}`;
     }
@@ -187,10 +195,35 @@ async function main() {
 
   // 4. Define all catalogs to build
   const catalogConfigs = [
+    // ── Home tab catalogs (type: series) ──────────────────────────────────────
     { catalogId: 'anilist-trending', query: TRENDING_QUERY },
-    { catalogId: 'anilist-season',   query: SEASON_QUERY,  baseVars: { season, seasonYear: year } },
+    { catalogId: 'anilist-season',   query: SEASON_QUERY, baseVars: { season, seasonYear: year } },
     { catalogId: 'anilist-popular',  query: POPULAR_QUERY },
-    { catalogId: 'anilist-top',      query: TOP_QUERY, pages: 1 },  // exactly 100 items
+    { catalogId: 'anilist-top',      query: TOP_QUERY, pages: 1 },
+
+    // ── Anime discover catalog (type: anime) — one page per filter ─────────────
+    // Default (no filter)
+    { catalogId: 'anilist-anime', type: 'anime', query: ANIME_DISCOVER_QUERY, pages: 1 },
+    // Genre
+    ...ANIME_GENRES.map(g => ({
+      catalogId: 'anilist-anime', type: 'anime', query: ANIME_DISCOVER_QUERY,
+      baseVars: { genre: g }, filterKey: 'genre', filterValue: g, pages: 1
+    })),
+    // Format
+    ...ANIME_FORMATS.map(({ display, anilist }) => ({
+      catalogId: 'anilist-anime', type: 'anime', query: ANIME_DISCOVER_QUERY,
+      baseVars: { format: anilist }, filterKey: 'format', filterValue: display, pages: 1
+    })),
+    // Status
+    ...ANIME_STATUSES.map(({ display, anilist }) => ({
+      catalogId: 'anilist-anime', type: 'anime', query: ANIME_DISCOVER_QUERY,
+      baseVars: { status: anilist }, filterKey: 'status', filterValue: display, pages: 1
+    })),
+    // Year (last 10 years)
+    ...ANIME_YEARS.map(y => ({
+      catalogId: 'anilist-anime', type: 'anime', query: ANIME_DISCOVER_QUERY,
+      baseVars: { year: y }, filterKey: 'year', filterValue: String(y), pages: 1
+    })),
   ];
 
   // 5. Build each catalog
@@ -198,8 +231,8 @@ async function main() {
   let failures = 0;
 
   for (const config of catalogConfigs) {
-    const label = config.genreLabel
-      ? `anilist-discover (${config.genreLabel})`
+    const label = config.filterKey
+      ? `${config.catalogId} (${config.filterKey}=${config.filterValue})`
       : config.catalogId;
     logger.info(`Building catalog: ${label}`);
     try {

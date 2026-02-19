@@ -5,8 +5,13 @@ const {
   TRENDING_QUERY,
   SEASON_QUERY,
   POPULAR_QUERY,
-  TOP_QUERY
+  TOP_QUERY,
+  ANIME_DISCOVER_QUERY
 } = require('../anilist/queries');
+
+// Maps Stremio display values → AniList enum values for the anime discover catalog
+const FORMAT_MAP = { 'TV': 'TV', 'Movie': 'MOVIE', 'OVA': 'OVA', 'ONA': 'ONA', 'Special': 'SPECIAL' };
+const STATUS_MAP = { 'Airing': 'RELEASING', 'Finished': 'FINISHED', 'Upcoming': 'NOT_YET_RELEASED' };
 const { resolveStremioId } = require('../mapping/idMapper');
 const { buildMetaPreview, getCurrentSeason } = require('../utils/anilistToMeta');
 const memCache = require('../cache/memCache');
@@ -17,7 +22,8 @@ const TTL = {
   'anilist-trending': 60 * 60,        // 1 hour
   'anilist-season':   6 * 60 * 60,    // 6 hours
   'anilist-popular':  12 * 60 * 60,   // 12 hours
-  'anilist-top':      24 * 60 * 60,   // 24 hours (top 100 rarely changes)
+  'anilist-top':      24 * 60 * 60,   // 24 hours
+  'anilist-anime':    6 * 60 * 60,    // 6 hours
 };
 
 /**
@@ -41,6 +47,13 @@ function buildVariables(catalogId, extra, page) {
     vars.seasonYear = year;
   }
 
+  if (catalogId === 'anilist-anime' && extra) {
+    if (extra.genre)  vars.genre  = extra.genre;
+    if (extra.format) vars.format = FORMAT_MAP[extra.format] || extra.format;
+    if (extra.status) vars.status = STATUS_MAP[extra.status] || extra.status;
+    if (extra.year)   vars.year   = parseInt(extra.year, 10);
+  }
+
   return vars;
 }
 
@@ -53,6 +66,7 @@ function pickQuery(catalogId) {
     case 'anilist-season':   return SEASON_QUERY;
     case 'anilist-popular':  return POPULAR_QUERY;
     case 'anilist-top':      return TOP_QUERY;
+    case 'anilist-anime':    return ANIME_DISCOVER_QUERY;
     default: return null;
   }
 }
@@ -90,10 +104,13 @@ async function fetchCatalog(catalogId, extra = {}) {
   const mediaList = (pageData && pageData.media) || [];
 
   // Resolve all IDs concurrently
+  // Items from the anime discover catalog get type 'anime' so they appear under
+  // the Anime section of the Discovery tab, separate from Movies and Series.
+  const overrideType = catalogId === 'anilist-anime' ? 'anime' : undefined;
   const metas = await Promise.all(
     mediaList.map(async media => {
       const stremioId = await resolveStremioId(media);
-      return buildMetaPreview(media, stremioId);
+      return buildMetaPreview(media, stremioId, overrideType);
     })
   );
 
