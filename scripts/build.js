@@ -218,8 +218,8 @@ async function buildAllMetas(allMediaMap) {
 // ─── None-genre aliases ───────────────────────────────────────────────────────
 
 /**
- * Create genre=None alias files by copying existing single-filter files.
- * No extra API calls — just file copies so Stremio can request genre=None&year=X etc.
+ * Create genre=All alias files by copying existing single-filter files.
+ * No extra API calls — just file copies so Stremio can request genre=All&year=X etc.
  * Keys are alphabetically sorted to match Stremio's URL encoding.
  */
 function createNoneAliases() {
@@ -230,37 +230,37 @@ function createNoneAliases() {
     }
   }
 
-  // genre=None alone → base catalog
+  // genre=All alone → base catalog
   alias(
     catalogFilePath('anime', 'anilist-anime', undefined),
-    catalogFilePath('anime', 'anilist-anime', 'genre=None')
+    catalogFilePath('anime', 'anilist-anime', 'genre=All')
   );
 
-  // genre=None + format  (sorted: format < genre)
+  // genre=All + format  (sorted: format < genre)
   for (const { display } of ANIME_FORMATS) {
     alias(
       catalogFilePath('anime', 'anilist-anime', `format=${display}`),
-      catalogFilePath('anime', 'anilist-anime', `format=${display}&genre=None`)
+      catalogFilePath('anime', 'anilist-anime', `format=${display}&genre=All`)
     );
   }
 
-  // genre=None + status  (sorted: genre < status)
+  // genre=All + status  (sorted: genre < status)
   for (const { display } of ANIME_STATUSES) {
     alias(
       catalogFilePath('anime', 'anilist-anime', `status=${display}`),
-      catalogFilePath('anime', 'anilist-anime', `genre=None&status=${display}`)
+      catalogFilePath('anime', 'anilist-anime', `genre=All&status=${display}`)
     );
   }
 
-  // genre=None + year  (sorted: genre < year)
+  // genre=All + year  (sorted: genre < year)
   for (const y of ANIME_YEARS) {
     alias(
       catalogFilePath('anime', 'anilist-anime', `year=${y}`),
-      catalogFilePath('anime', 'anilist-anime', `genre=None&year=${y}`)
+      catalogFilePath('anime', 'anilist-anime', `genre=All&year=${y}`)
     );
   }
 
-  logger.info('  created genre=None alias files');
+  logger.info('  created genre=All alias files');
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -388,7 +388,7 @@ async function main() {
     }
   }
 
-  // 6. Create genre=None alias files (copies of single-filter files, no extra API calls)
+  // 6. Create genre=All alias files (copies of single-filter files, no extra API calls)
   createNoneAliases();
 
   // 7. Build meta files
