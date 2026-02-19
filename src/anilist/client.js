@@ -34,7 +34,7 @@ async function anilistQuery(query, variables = {}) {
     }
 
     if (res.status === 429) {
-      const retryAfter = parseInt(res.headers.get('retry-after') || '60', 10);
+      const retryAfter = Math.max(60, parseInt(res.headers.get('retry-after') || '60', 10));
       logger.warn(`AniList rate limited. Waiting ${retryAfter}s (attempt ${attempt}/3)`);
       await sleep(retryAfter * 1000);
       continue;
