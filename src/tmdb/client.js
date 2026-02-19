@@ -23,8 +23,8 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
  * Returns null on 404 (not found), throws on other errors.
  */
 async function fetchTmdbSeries(tmdbId) {
-  // append_to_response fetches credits (cast) and videos (trailers) in the same request
-  const url = `${TMDB_API}/tv/${tmdbId}?api_key=${apiKey()}&language=en-US&append_to_response=credits,videos`;
+  // aggregate_credits gives the full voice-cast list across all episodes (richer than credits for anime)
+  const url = `${TMDB_API}/tv/${tmdbId}?api_key=${apiKey()}&language=en-US&append_to_response=aggregate_credits,videos`;
   const res = await fetch(url);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`TMDB /tv/${tmdbId} returned ${res.status}`);
@@ -122,9 +122,9 @@ function buildMetaFromTmdb(series, allEpisodes, stremioId, imdbId) {
   // Include IMDB ID so Stremio and stream addons can cross-reference
   if (imdbId) meta.imdbId = imdbId;
 
-  // Cast — top 10 credited actors (voice cast for anime)
-  if (series.credits && Array.isArray(series.credits.cast) && series.credits.cast.length > 0) {
-    meta.cast = series.credits.cast.slice(0, 10).map(c => c.name);
+  // Cast — top 10 from aggregate_credits (covers all episodes, much more complete for anime)
+  if (series.aggregate_credits && Array.isArray(series.aggregate_credits.cast) && series.aggregate_credits.cast.length > 0) {
+    meta.cast = series.aggregate_credits.cast.slice(0, 10).map(c => c.name);
   }
 
   // Trailer — first YouTube trailer from TMDB videos
