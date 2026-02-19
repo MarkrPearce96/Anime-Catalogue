@@ -29,26 +29,9 @@ const manifest = {
     },
     {
       type: 'series',
-      id: 'anilist-az',
-      name: 'A-Z',
+      id: 'anilist-top',
+      name: 'Top 100 Anime',
       extra: [{ name: 'skip', isRequired: false }]
-    },
-    {
-      type: 'series',
-      id: 'anilist-discover',
-      name: 'Anime',
-      extra: [
-        {
-          name: 'genre',
-          isRequired: false,
-          options: [
-            'Action', 'Adventure', 'Comedy', 'Drama', 'Fantasy', 'Horror',
-            'Mahou Shoujo', 'Mecha', 'Music', 'Mystery', 'Psychological',
-            'Romance', 'Sci-Fi', 'Slice of Life', 'Sports', 'Supernatural', 'Thriller'
-          ]
-        },
-        { name: 'skip', isRequired: false }
-      ]
     }
   ]
 };

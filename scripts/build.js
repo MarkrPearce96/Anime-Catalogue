@@ -20,11 +20,10 @@ const { initFribbDb, getTmdbId } = require('../src/mapping/fribbDb');
 const { resolveStremioId } = require('../src/mapping/idMapper');
 const { queryPage }        = require('../src/anilist/client');
 const {
-  TRENDING_QUERY, SEASON_QUERY, POPULAR_QUERY,
-  AZ_QUERY, GENRE_QUERY
+  TRENDING_QUERY, SEASON_QUERY, POPULAR_QUERY, TOP_QUERY
 } = require('../src/anilist/queries');
 const { buildMetaPreview, buildFullMeta, getCurrentSeason } = require('../src/utils/anilistToMeta');
-const { fetchTmdbSeries, fetchTmdbAllEpisodes, fetchTmdbExternalIds, buildMetaFromTmdb } = require('../src/tmdb/client');
+const { fetchTmdbSeries, fetchTmdbAllEpisodes, fetchTmdbExternalIds, fetchTmdbAggregateCredits, buildMetaFromTmdb } = require('../src/tmdb/client');
 const manifest = require('../src/manifest');
 const logger   = require('../src/utils/logger');
 
@@ -33,13 +32,7 @@ const TMDB_API_KEY = process.env.TMDB_API_KEY;
 // ─── Config ──────────────────────────────────────────────────────────────────
 
 const DIST   = path.join(__dirname, '../dist');
-const PAGES  = 3;   // pages per catalog (100 items/page → 300 items per catalog)
-
-const GENRES = [
-  'Action', 'Adventure', 'Comedy', 'Drama', 'Fantasy', 'Horror',
-  'Mahou Shoujo', 'Mecha', 'Music', 'Mystery', 'Psychological',
-  'Romance', 'Sci-Fi', 'Slice of Life', 'Sports', 'Supernatural', 'Thriller'
-];
+const PAGES  = 3;   // default pages per catalog (100 items/page → 300 items)
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -94,9 +87,9 @@ async function buildCatalogPage(query, vars, type, catalogId, extraKey) {
  * Build all pages for a single catalog config.
  */
 async function buildCatalog(config, allMediaMap) {
-  const { catalogId, type = 'series', query, baseVars = {}, genreLabel } = config;
+  const { catalogId, type = 'series', query, baseVars = {}, genreLabel, pages = PAGES } = config;
 
-  for (let page = 1; page <= PAGES; page++) {
+  for (let page = 1; page <= pages; page++) {
     const vars = { ...baseVars, page, perPage: 100 };
 
     // Build the extra key that matches Stremio's URL path segment:
@@ -138,15 +131,16 @@ async function buildAllMetas(allMediaMap) {
 
     if (tmdbId) {
       try {
-        // Fetch series details and external IDs in parallel
-        const [series, externalIds] = await Promise.all([
+        // Fetch series details, external IDs, and aggregate cast in parallel
+        const [series, externalIds, aggregateCredits] = await Promise.all([
           fetchTmdbSeries(tmdbId),
           fetchTmdbExternalIds(tmdbId),
+          fetchTmdbAggregateCredits(tmdbId),
         ]);
         if (series) {
           const imdbId  = (externalIds && externalIds.imdb_id) || null;
           const episodes = await fetchTmdbAllEpisodes(tmdbId, series.number_of_seasons || 1);
-          const meta = buildMetaFromTmdb(series, episodes, stremioId, imdbId);
+          const meta = buildMetaFromTmdb(series, episodes, stremioId, imdbId, aggregateCredits);
           writeJson(metaFilePath(type, stremioId), { meta });
           tmdbCount++;
           await sleep(150); // respect TMDB rate limit
@@ -196,14 +190,7 @@ async function main() {
     { catalogId: 'anilist-trending', query: TRENDING_QUERY },
     { catalogId: 'anilist-season',   query: SEASON_QUERY,  baseVars: { season, seasonYear: year } },
     { catalogId: 'anilist-popular',  query: POPULAR_QUERY },
-    { catalogId: 'anilist-az',       query: AZ_QUERY },
-    // Discover: one entry per genre
-    ...GENRES.map(genre => ({
-      catalogId: 'anilist-discover',
-      query: GENRE_QUERY,
-      baseVars: { genre },
-      genreLabel: genre
-    }))
+    { catalogId: 'anilist-top',      query: TOP_QUERY, pages: 1 },  // exactly 100 items
   ];
 
   // 5. Build each catalog

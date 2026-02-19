@@ -23,12 +23,25 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
  * Returns null on 404 (not found), throws on other errors.
  */
 async function fetchTmdbSeries(tmdbId) {
-  // aggregate_credits gives the full voice-cast list across all episodes (richer than credits for anime)
-  const url = `${TMDB_API}/tv/${tmdbId}?api_key=${apiKey()}&language=en-US&append_to_response=aggregate_credits,videos`;
+  // videos is appended here; aggregate_credits must be a separate call (not supported via append_to_response)
+  const url = `${TMDB_API}/tv/${tmdbId}?api_key=${apiKey()}&language=en-US&append_to_response=videos`;
   const res = await fetch(url);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`TMDB /tv/${tmdbId} returned ${res.status}`);
   return res.json();
+}
+
+/**
+ * Fetch aggregate cast credits for a TV series (all voice actors across all episodes).
+ * This is a separate endpoint — it cannot be combined via append_to_response.
+ * Returns null on error.
+ */
+async function fetchTmdbAggregateCredits(tmdbId) {
+  const url = `${TMDB_API}/tv/${tmdbId}/aggregate_credits?api_key=${apiKey()}&language=en-US`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  return res.json();
+  // Returns: { cast: [{ name, roles: [{ character, episode_count }], ... }], crew: [...] }
 }
 
 /**
@@ -99,7 +112,7 @@ async function fetchTmdbExternalIds(tmdbId) {
  *                                    so Torrentio routes streams via its IMDB path (better coverage)
  * @returns {object}
  */
-function buildMetaFromTmdb(series, allEpisodes, stremioId, imdbId) {
+function buildMetaFromTmdb(series, allEpisodes, stremioId, imdbId, aggregateCredits) {
   const statusMap = {
     'Returning Series': 'Continuing',
     'Ended':            'Ended',
@@ -122,9 +135,9 @@ function buildMetaFromTmdb(series, allEpisodes, stremioId, imdbId) {
   // Include IMDB ID so Stremio and stream addons can cross-reference
   if (imdbId) meta.imdbId = imdbId;
 
-  // Cast — top 10 from aggregate_credits (covers all episodes, much more complete for anime)
-  if (series.aggregate_credits && Array.isArray(series.aggregate_credits.cast) && series.aggregate_credits.cast.length > 0) {
-    meta.cast = series.aggregate_credits.cast.slice(0, 10).map(c => c.name);
+  // Cast — top 10 voice actors from aggregate_credits (fetched as a separate API call)
+  if (aggregateCredits && Array.isArray(aggregateCredits.cast) && aggregateCredits.cast.length > 0) {
+    meta.cast = aggregateCredits.cast.slice(0, 10).map(c => c.name);
   }
 
   // Trailer — first YouTube trailer from TMDB videos
@@ -178,5 +191,6 @@ module.exports = {
   fetchTmdbSeason,
   fetchTmdbAllEpisodes,
   fetchTmdbExternalIds,
+  fetchTmdbAggregateCredits,
   buildMetaFromTmdb,
 };

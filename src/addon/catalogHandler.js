@@ -5,8 +5,7 @@ const {
   TRENDING_QUERY,
   SEASON_QUERY,
   POPULAR_QUERY,
-  AZ_QUERY,
-  GENRE_QUERY
+  TOP_QUERY
 } = require('../anilist/queries');
 const { resolveStremioId } = require('../mapping/idMapper');
 const { buildMetaPreview, getCurrentSeason } = require('../utils/anilistToMeta');
@@ -18,8 +17,7 @@ const TTL = {
   'anilist-trending': 60 * 60,        // 1 hour
   'anilist-season':   6 * 60 * 60,    // 6 hours
   'anilist-popular':  12 * 60 * 60,   // 12 hours
-  'anilist-az':       24 * 60 * 60,   // 24 hours
-  'anilist-discover': 6 * 60 * 60     // 6 hours
+  'anilist-top':      24 * 60 * 60,   // 24 hours (top 100 rarely changes)
 };
 
 /**
@@ -43,10 +41,6 @@ function buildVariables(catalogId, extra, page) {
     vars.seasonYear = year;
   }
 
-  if (catalogId === 'anilist-discover' && extra && extra.genre) {
-    vars.genre = extra.genre;
-  }
-
   return vars;
 }
 
@@ -58,8 +52,7 @@ function pickQuery(catalogId) {
     case 'anilist-trending': return TRENDING_QUERY;
     case 'anilist-season':   return SEASON_QUERY;
     case 'anilist-popular':  return POPULAR_QUERY;
-    case 'anilist-az':       return AZ_QUERY;
-    case 'anilist-discover': return GENRE_QUERY;
+    case 'anilist-top':      return TOP_QUERY;
     default: return null;
   }
 }

@@ -87,28 +87,14 @@ const POPULAR_QUERY = `
   }
 `;
 
-const AZ_QUERY = `
-  query AZAnime($page: Int, $perPage: Int) {
+const TOP_QUERY = `
+  query TopAnime($page: Int, $perPage: Int) {
     Page(page: $page, perPage: $perPage) {
       pageInfo {
         hasNextPage
         total
       }
-      media(type: ANIME, isAdult: false, sort: TITLE_ENGLISH) {
-        ${MEDIA_FIELDS}
-      }
-    }
-  }
-`;
-
-const GENRE_QUERY = `
-  query GenreAnime($page: Int, $perPage: Int, $genre: String) {
-    Page(page: $page, perPage: $perPage) {
-      pageInfo {
-        hasNextPage
-        total
-      }
-      media(type: ANIME, isAdult: false, sort: POPULARITY_DESC, genre: $genre) {
+      media(type: ANIME, isAdult: false, sort: SCORE_DESC) {
         ${MEDIA_FIELDS}
       }
     }
@@ -127,7 +113,6 @@ module.exports = {
   TRENDING_QUERY,
   SEASON_QUERY,
   POPULAR_QUERY,
-  AZ_QUERY,
-  GENRE_QUERY,
+  TOP_QUERY,
   MEDIA_BY_ID_QUERY
 };
