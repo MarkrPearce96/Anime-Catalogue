@@ -39,7 +39,7 @@ const ANIME_GENRES  = ['Action','Adventure','Comedy','Drama','Fantasy','Horror',
 const ANIME_FORMATS = [{ display: 'TV', anilist: 'TV' }, { display: 'Movie', anilist: 'MOVIE' }, { display: 'OVA', anilist: 'OVA' }, { display: 'ONA', anilist: 'ONA' }, { display: 'Special', anilist: 'SPECIAL' }];
 const ANIME_STATUSES = [{ display: 'Airing', anilist: 'RELEASING' }, { display: 'Finished', anilist: 'FINISHED' }, { display: 'Upcoming', anilist: 'NOT_YET_RELEASED' }];
 const currentYear   = new Date().getFullYear();
-const ANIME_YEARS   = Array.from({ length: 10 }, (_, i) => currentYear - i);
+const ANIME_YEARS   = Array.from({ length: currentYear - 1979 }, (_, i) => currentYear - i);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
