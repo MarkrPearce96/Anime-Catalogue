@@ -142,44 +142,6 @@ const MEDIA_BY_ID_QUERY = `
   }
 `;
 
-const MEDIA_META_QUERY = `
-  query MediaMeta($id: Int) {
-    Media(id: $id, type: ANIME) {
-      ${MEDIA_FIELDS}
-      characters(sort: [ROLE, RELEVANCE], page: 1, perPage: 15) {
-        edges {
-          node { name { full } siteUrl }
-          voiceActors(language: JAPANESE) { name { full } siteUrl }
-          role
-        }
-      }
-      staff(sort: RELEVANCE, page: 1, perPage: 5) {
-        edges {
-          node { name { full } siteUrl }
-          role
-        }
-      }
-      relations {
-        edges {
-          node { id title { romaji english } type siteUrl }
-          relationType
-        }
-      }
-      recommendations(sort: RATING_DESC, page: 1, perPage: 10) {
-        edges {
-          node {
-            mediaRecommendation {
-              title { romaji english }
-              type
-              siteUrl
-            }
-          }
-        }
-      }
-    }
-  }
-`;
-
 module.exports = {
   TRENDING_QUERY,
   SEASON_QUERY,
@@ -187,6 +149,5 @@ module.exports = {
   TOP_QUERY,
   ANIME_DISCOVER_QUERY,
   RECENTLY_UPDATED_QUERY,
-  MEDIA_BY_ID_QUERY,
-  MEDIA_META_QUERY
+  MEDIA_BY_ID_QUERY
 };

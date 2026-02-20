@@ -90,97 +90,6 @@ function buildMetaPreview(media, stremioId, overrideType) {
 }
 
 /**
- * Extract enrichment links (characters, voice actors, staff, relations,
- * recommendations) from an AniList media object fetched with MEDIA_META_QUERY.
- * Returns an array of Stremio link objects.
- * @param {object} media
- * @returns {Array<{name: string, category: string, url?: string}>}
- */
-function buildEnrichmentLinks(media) {
-  const links = [];
-
-  // Characters & Voice Actors
-  if (media.characters && media.characters.edges) {
-    for (const edge of media.characters.edges) {
-      if (edge.node && edge.node.name && edge.node.name.full) {
-        links.push({
-          name: edge.node.name.full,
-          category: 'Characters',
-          url: edge.node.siteUrl || undefined
-        });
-      }
-      if (edge.voiceActors) {
-        for (const va of edge.voiceActors) {
-          if (va.name && va.name.full) {
-            links.push({
-              name: va.name.full,
-              category: 'Voice Actors',
-              url: va.siteUrl || undefined
-            });
-          }
-        }
-      }
-    }
-  }
-
-  // Staff
-  if (media.staff && media.staff.edges) {
-    for (const edge of media.staff.edges) {
-      if (edge.node && edge.node.name && edge.node.name.full) {
-        links.push({
-          name: edge.node.name.full,
-          category: 'Staff',
-          url: edge.node.siteUrl || undefined
-        });
-      }
-    }
-  }
-
-  // Relations (anime only)
-  if (media.relations && media.relations.edges) {
-    const relationLabels = {
-      SEQUEL: 'Sequel',
-      PREQUEL: 'Prequel',
-      SIDE_STORY: 'Side Story',
-      PARENT: 'Parent',
-      SPIN_OFF: 'Spin-Off',
-      ALTERNATIVE: 'Alternative',
-      SUMMARY: 'Summary',
-      OTHER: 'Other',
-      CHARACTER: 'Character',
-      COMPILATION: 'Compilation',
-      CONTAINS: 'Contains'
-    };
-    for (const edge of media.relations.edges) {
-      if (!edge.node || edge.node.type !== 'ANIME') continue;
-      const label = relationLabels[edge.relationType] || edge.relationType;
-      const title = (edge.node.title && (edge.node.title.english || edge.node.title.romaji)) || 'Unknown';
-      links.push({
-        name: title,
-        category: label,
-        url: edge.node.siteUrl || undefined
-      });
-    }
-  }
-
-  // Recommendations
-  if (media.recommendations && media.recommendations.edges) {
-    for (const edge of media.recommendations.edges) {
-      const rec = edge.node && edge.node.mediaRecommendation;
-      if (!rec || rec.type !== 'ANIME') continue;
-      const title = (rec.title && (rec.title.english || rec.title.romaji)) || 'Unknown';
-      links.push({
-        name: title,
-        category: 'Recommendations',
-        url: rec.siteUrl || undefined
-      });
-    }
-  }
-
-  return links;
-}
-
-/**
  * Build a full meta object (for meta handler responses).
  * @param {object} media
  * @param {string} stremioId
@@ -226,9 +135,6 @@ function buildFullMeta(media, stremioId) {
       url: studio.siteUrl || undefined
     });
   }
-
-  // Enrichment links (characters, voice actors, staff, relations, recommendations)
-  meta.links.push(...buildEnrichmentLinks(media));
 
   // Status
   if (media.status) {
@@ -284,7 +190,6 @@ module.exports = {
   anilistFormatToStremioType,
   buildMetaPreview,
   buildFullMeta,
-  buildEnrichmentLinks,
   buildVideosFromKitsuEpisodes,
   getTitle,
   stripHtml
