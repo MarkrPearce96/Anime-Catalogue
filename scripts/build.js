@@ -9,10 +9,10 @@
  *   dist/catalog/series/anilist-trending.json          (page 1)
  *   dist/catalog/series/anilist-trending/skip=100.json (page 2)
  *   dist/catalog/series/anilist-discover/genre=Action.json
- *   dist/meta/series/anilist:16498.json
+ *   dist/meta/series/tmdb:12345.json
  */
 
-const fs   = require('fs');
+const fs = require('fs');
 const path = require('path');
 
 const { initOfflineDb }    = require('../src/mapping/offlineDb');
@@ -26,7 +26,8 @@ const {
 const { buildMetaPreview, buildFullMeta, getCurrentSeason } = require('../src/utils/anilistToMeta');
 const { fetchTmdbSeries, fetchTmdbAllEpisodes, fetchTmdbExternalIds, fetchTmdbAggregateCredits, buildMetaFromTmdb } = require('../src/tmdb/client');
 const manifest = require('../src/manifest');
-const logger   = require('../src/utils/logger');
+const logger = require('../src/utils/logger');
+const sleep = require('../src/utils/sleep');
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
 
@@ -59,10 +60,6 @@ function catalogFilePath(type, id, extra) {
 
 function metaFilePath(type, id) {
   return path.join(DIST, 'meta', type, `${id}.json`);
-}
-
-function sleep(ms) {
-  return new Promise(r => setTimeout(r, ms));
 }
 
 // ─── Core build functions ─────────────────────────────────────────────────────
@@ -177,7 +174,7 @@ async function buildCatalog(config, allMediaMap) {
     const buildFn = airing ? buildAiringCatalogPage : buildCatalogPage;
     const metas = await buildFn(query, vars, type, catalogId, extraKey);
 
-    // collect all IDs for meta pre-generation (kitsu: and anilist:)
+    // collect all IDs for meta pre-generation (tmdb:, kitsu:, and anilist:)
     for (const { media, stremioId } of metas) {
       allMediaMap.set(stremioId, { media, type });
     }

@@ -2,6 +2,7 @@
 
 const fetch = require('node-fetch');
 const logger = require('../utils/logger');
+const sleep = require('../utils/sleep');
 
 const ANILIST_API = 'https://graphql.anilist.co';
 const PER_PAGE = 100;
@@ -81,10 +82,6 @@ async function queryPage(query, variables = {}) {
 async function queryMedia(query, variables = {}) {
   const data = await anilistQuery(query, variables);
   return data.Media;
-}
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /**

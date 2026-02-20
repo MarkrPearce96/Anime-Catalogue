@@ -1,7 +1,8 @@
 'use strict';
 
-const fetch  = require('node-fetch');
+const fetch = require('node-fetch');
 const logger = require('../utils/logger');
+const sleep = require('../utils/sleep');
 
 const TMDB_API   = 'https://api.themoviedb.org/3';
 const TMDB_IMG   = 'https://image.tmdb.org/t/p';
@@ -15,8 +16,6 @@ function apiKey() {
 function poster(p)     { return p ? `${TMDB_IMG}/w500${p}`    : undefined; }
 function backdrop(p)   { return p ? `${TMDB_IMG}/original${p}`: undefined; }
 function still(p)      { return p ? `${TMDB_IMG}/w300${p}`    : undefined; }
-
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 /**
  * Fetch TV series details from TMDB.

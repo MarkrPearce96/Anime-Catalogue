@@ -76,7 +76,7 @@ async function downloadDatabase() {
 
 /**
  * Initialise — load from disk if fresh enough, else download.
- * "Fresh enough" = file modified within 24h.
+ * "Fresh enough" = file modified within 7 days.
  */
 async function initOfflineDb() {
   let json = null;

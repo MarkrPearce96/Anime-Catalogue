@@ -9,14 +9,14 @@ const {
   ANIME_DISCOVER_QUERY,
   RECENTLY_UPDATED_QUERY
 } = require('../anilist/queries');
-
-// Maps Stremio display values → AniList enum values for the anime discover catalog
-const FORMAT_MAP = { 'TV': 'TV', 'Movie': 'MOVIE', 'OVA': 'OVA', 'ONA': 'ONA', 'Special': 'SPECIAL' };
-const STATUS_MAP = { 'Airing': 'RELEASING', 'Finished': 'FINISHED', 'Upcoming': 'NOT_YET_RELEASED' };
 const { resolveStremioId } = require('../mapping/idMapper');
 const { buildMetaPreview, getCurrentSeason } = require('../utils/anilistToMeta');
 const memCache = require('../cache/memCache');
 const logger = require('../utils/logger');
+
+// Maps Stremio display values → AniList enum values for the anime discover catalog
+const FORMAT_MAP = { 'TV': 'TV', 'Movie': 'MOVIE', 'OVA': 'OVA', 'ONA': 'ONA', 'Special': 'SPECIAL' };
+const STATUS_MAP = { 'Airing': 'RELEASING', 'Finished': 'FINISHED', 'Upcoming': 'NOT_YET_RELEASED' };
 
 // TTL constants (seconds)
 const TTL = {

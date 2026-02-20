@@ -7,8 +7,8 @@ const { fetchKitsuEpisodes } = require('../kitsu/client');
 const { fetchTmdbSeries, fetchTmdbAllEpisodes, fetchTmdbExternalIds, fetchTmdbAggregateCredits, buildMetaFromTmdb } = require('../tmdb/client');
 const { getAnilistId, getKitsuId } = require('../mapping/offlineDb');
 const { getTmdbId, getAnilistIdFromTmdb } = require('../mapping/fribbDb');
-const memCache          = require('../cache/memCache');
-const logger            = require('../utils/logger');
+const memCache = require('../cache/memCache');
+const logger = require('../utils/logger');
 
 const META_TTL = 24 * 60 * 60; // 24 hours
 

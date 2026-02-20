@@ -1,6 +1,6 @@
 'use strict';
 
-const fs   = require('fs');
+const fs = require('fs');
 const path = require('path');
 const fetch = require('node-fetch');
 const logger = require('../utils/logger');
