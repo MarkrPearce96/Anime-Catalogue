@@ -40,6 +40,7 @@ const PAGES  = 3;   // default pages per catalog (100 items/page → 300 items)
 const ANIME_GENRES  = ['Action','Adventure','Comedy','Drama','Fantasy','Horror','Mahou Shoujo','Mecha','Music','Mystery','Psychological','Romance','Sci-Fi','Slice of Life','Sports','Supernatural','Thriller'];
 const ANIME_FORMATS = [{ display: 'TV', anilist: 'TV' }, { display: 'Movie', anilist: 'MOVIE' }, { display: 'OVA', anilist: 'OVA' }, { display: 'ONA', anilist: 'ONA' }, { display: 'Special', anilist: 'SPECIAL' }];
 const ANIME_STATUSES = [{ display: 'Airing', anilist: 'RELEASING' }, { display: 'Finished', anilist: 'FINISHED' }, { display: 'Upcoming', anilist: 'NOT_YET_RELEASED' }];
+const ANIME_SORTS   = [{ display: 'Popular', anilist: 'POPULARITY_DESC' }, { display: 'Top Rated', anilist: 'SCORE_DESC' }, { display: 'Trending', anilist: 'TRENDING_DESC' }, { display: 'Newest', anilist: 'START_DATE_DESC' }];
 const currentYear   = new Date().getFullYear();
 const ANIME_YEARS   = Array.from({ length: currentYear - 1994 }, (_, i) => currentYear - i);
 
@@ -384,6 +385,22 @@ async function main() {
         baseVars: { genre: g, year: y },
         filterKey: 'genre', filterValue: g,
         extraFilters: { year: String(y) },
+        pages: 1, skipIfExists: true
+      }))
+    ),
+    // Sort (4 combos) — e.g. sort=Top Rated.json
+    ...ANIME_SORTS.map(({ display, anilist }) => ({
+      catalogId: 'anilist-anime', type: 'anime', query: ANIME_DISCOVER_QUERY,
+      baseVars: { sort: [anilist] }, filterKey: 'sort', filterValue: display, pages: 1,
+      skipIfExists: true
+    })),
+    // Genre + Sort (17 × 4 = 68 combos) — e.g. genre=Action&sort=Trending.json
+    ...ANIME_GENRES.flatMap(g =>
+      ANIME_SORTS.map(({ display, anilist }) => ({
+        catalogId: 'anilist-anime', type: 'anime', query: ANIME_DISCOVER_QUERY,
+        baseVars: { genre: g, sort: [anilist] },
+        filterKey: 'genre', filterValue: g,
+        extraFilters: { sort: display },
         pages: 1, skipIfExists: true
       }))
     ),

@@ -102,13 +102,13 @@ const TOP_QUERY = `
 `;
 
 const ANIME_DISCOVER_QUERY = `
-  query AnimeDiscover($page: Int, $perPage: Int, $genre: String, $format: MediaFormat, $status: MediaStatus, $year: Int) {
+  query AnimeDiscover($page: Int, $perPage: Int, $genre: String, $format: MediaFormat, $status: MediaStatus, $year: Int, $sort: [MediaSort] = [POPULARITY_DESC]) {
     Page(page: $page, perPage: $perPage) {
       pageInfo {
         hasNextPage
         total
       }
-      media(type: ANIME, isAdult: false, sort: POPULARITY_DESC, genre: $genre, format: $format, status: $status, seasonYear: $year) {
+      media(type: ANIME, isAdult: false, sort: $sort, genre: $genre, format: $format, status: $status, seasonYear: $year) {
         ${MEDIA_FIELDS}
       }
     }

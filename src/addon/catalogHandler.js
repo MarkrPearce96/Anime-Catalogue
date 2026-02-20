@@ -17,6 +17,7 @@ const logger = require('../utils/logger');
 // Maps Stremio display values → AniList enum values for the anime discover catalog
 const FORMAT_MAP = { 'TV': 'TV', 'Movie': 'MOVIE', 'OVA': 'OVA', 'ONA': 'ONA', 'Special': 'SPECIAL' };
 const STATUS_MAP = { 'Airing': 'RELEASING', 'Finished': 'FINISHED', 'Upcoming': 'NOT_YET_RELEASED' };
+const SORT_MAP = { 'Popular': 'POPULARITY_DESC', 'Top Rated': 'SCORE_DESC', 'Trending': 'TRENDING_DESC', 'Newest': 'START_DATE_DESC' };
 
 // TTL constants (seconds)
 const TTL = {
@@ -54,6 +55,7 @@ function buildVariables(catalogId, extra, page) {
     if (extra.format) vars.format = FORMAT_MAP[extra.format] || extra.format;
     if (extra.status) vars.status = STATUS_MAP[extra.status] || extra.status;
     if (extra.year)   vars.year   = parseInt(extra.year, 10);
+    if (extra.sort)   vars.sort   = [SORT_MAP[extra.sort] || 'POPULARITY_DESC'];
   }
 
   if (catalogId === 'anilist-recently-updated') {

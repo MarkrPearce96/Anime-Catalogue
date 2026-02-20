@@ -72,6 +72,11 @@ const manifest = {
           isRequired: false,
           options: YEAR_OPTIONS
         },
+        {
+          name: 'sort',
+          isRequired: false,
+          options: ['Popular', 'Top Rated', 'Trending', 'Newest']
+        },
         { name: 'skip', isRequired: false }
       ]
     }
