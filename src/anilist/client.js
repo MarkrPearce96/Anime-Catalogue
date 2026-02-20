@@ -87,4 +87,13 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-module.exports = { anilistQuery, queryPage, queryMedia };
+/**
+ * Query an airing schedule endpoint and return the airingSchedules array.
+ */
+async function queryAiringSchedule(query, variables = {}) {
+  const vars = Object.assign({ perPage: PER_PAGE }, variables);
+  const data = await anilistQuery(query, vars);
+  return (data.Page && data.Page.airingSchedules) || [];
+}
+
+module.exports = { anilistQuery, queryPage, queryMedia, queryAiringSchedule };

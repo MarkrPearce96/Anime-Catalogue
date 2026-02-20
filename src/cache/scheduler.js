@@ -26,6 +26,7 @@ function startScheduler() {
   // --- Initial pre-warm (async, non-blocking) ---
   prewarm('anilist-trending');
   prewarm('anilist-season');
+  prewarm('anilist-recently-updated');
 
   // --- Trending: refresh every 1 hour ---
   INTERVALS.push(
@@ -35,6 +36,11 @@ function startScheduler() {
   // --- Season: refresh every 6 hours ---
   INTERVALS.push(
     setInterval(() => prewarm('anilist-season'), 6 * 60 * 60 * 1000)
+  );
+
+  // --- Recently Updated: refresh every 30 minutes ---
+  INTERVALS.push(
+    setInterval(() => prewarm('anilist-recently-updated'), 30 * 60 * 1000)
   );
 
   // --- Offline DB: re-download every 24 hours ---
@@ -57,7 +63,7 @@ function startScheduler() {
     }, 30 * 60 * 1000)
   );
 
-  logger.info('scheduler: started (trending 1h, season 6h, offline DB 24h, eviction 30m)');
+  logger.info('scheduler: started (trending 1h, season 6h, recently-updated 30m, offline DB 24h, eviction 30m)');
 }
 
 /**

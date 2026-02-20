@@ -115,6 +115,25 @@ const ANIME_DISCOVER_QUERY = `
   }
 `;
 
+const RECENTLY_UPDATED_QUERY = `
+  query RecentlyUpdated($page: Int, $perPage: Int, $airingAt_greater: Int, $airingAt_lesser: Int) {
+    Page(page: $page, perPage: $perPage) {
+      pageInfo {
+        hasNextPage
+        total
+      }
+      airingSchedules(airingAt_greater: $airingAt_greater, airingAt_lesser: $airingAt_lesser, sort: TIME_DESC) {
+        episode
+        airingAt
+        media {
+          ${MEDIA_FIELDS}
+          isAdult
+        }
+      }
+    }
+  }
+`;
+
 const MEDIA_BY_ID_QUERY = `
   query MediaById($id: Int) {
     Media(id: $id, type: ANIME) {
@@ -129,5 +148,6 @@ module.exports = {
   POPULAR_QUERY,
   TOP_QUERY,
   ANIME_DISCOVER_QUERY,
+  RECENTLY_UPDATED_QUERY,
   MEDIA_BY_ID_QUERY
 };

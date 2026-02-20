@@ -18,9 +18,10 @@ const path = require('path');
 const { initOfflineDb }    = require('../src/mapping/offlineDb');
 const { initFribbDb, getTmdbId } = require('../src/mapping/fribbDb');
 const { resolveStremioId } = require('../src/mapping/idMapper');
-const { queryPage }        = require('../src/anilist/client');
+const { queryPage, queryAiringSchedule } = require('../src/anilist/client');
 const {
-  TRENDING_QUERY, SEASON_QUERY, POPULAR_QUERY, TOP_QUERY, ANIME_DISCOVER_QUERY
+  TRENDING_QUERY, SEASON_QUERY, POPULAR_QUERY, TOP_QUERY, ANIME_DISCOVER_QUERY,
+  RECENTLY_UPDATED_QUERY
 } = require('../src/anilist/queries');
 const { buildMetaPreview, buildFullMeta, getCurrentSeason } = require('../src/utils/anilistToMeta');
 const { fetchTmdbSeries, fetchTmdbAllEpisodes, fetchTmdbExternalIds, fetchTmdbAggregateCredits, buildMetaFromTmdb } = require('../src/tmdb/client');
@@ -92,13 +93,46 @@ async function buildCatalogPage(query, vars, type, catalogId, extraKey) {
 }
 
 /**
+ * Fetch one page of the airing schedule catalog, deduplicate, write JSON.
+ */
+async function buildAiringCatalogPage(query, vars, type, catalogId, extraKey) {
+  const schedules = await queryAiringSchedule(query, vars);
+
+  // Deduplicate by media ID — first occurrence = most recently aired
+  const seen = new Set();
+  const dedupedMedia = [];
+  for (const schedule of schedules) {
+    if (!schedule.media || schedule.media.isAdult) continue;
+    if (seen.has(schedule.media.id)) continue;
+    seen.add(schedule.media.id);
+    dedupedMedia.push(schedule.media);
+  }
+
+  const overrideType = type === 'anime' ? 'anime' : undefined;
+  const metas = await Promise.all(
+    dedupedMedia.map(async media => {
+      const stremioId = await resolveStremioId(media);
+      return { meta: buildMetaPreview(media, stremioId, overrideType), media, stremioId };
+    })
+  );
+
+  writeJson(
+    catalogFilePath(type, catalogId, extraKey),
+    { metas: metas.map(m => m.meta) }
+  );
+
+  logger.info(`  wrote catalog/${type}/${catalogId}${extraKey ? '/' + extraKey : ''} (${metas.length} items)`);
+  return metas;
+}
+
+/**
  * Build all pages for a single catalog config.
  */
 async function buildCatalog(config, allMediaMap) {
   const {
     catalogId, type = 'series', query, baseVars = {},
     filterKey, filterValue, extraFilters = {}, pages = PAGES,
-    skipIfExists = false
+    skipIfExists = false, airing = false
   } = config;
 
   // Compute the page-1 file path to check existence
@@ -140,7 +174,8 @@ async function buildCatalog(config, allMediaMap) {
       extraKey = page === 1 ? undefined : `skip=${(page - 1) * 100}`;
     }
 
-    const metas = await buildCatalogPage(query, vars, type, catalogId, extraKey);
+    const buildFn = airing ? buildAiringCatalogPage : buildCatalogPage;
+    const metas = await buildFn(query, vars, type, catalogId, extraKey);
 
     // collect all IDs for meta pre-generation (kitsu: and anilist:)
     for (const { media, stremioId } of metas) {
@@ -272,6 +307,8 @@ async function main() {
     path.join(DIST, 'catalog', 'series', 'anilist-popular.json'),
     path.join(DIST, 'catalog', 'series', 'anilist-popular'),
     path.join(DIST, 'catalog', 'series', 'anilist-top.json'),
+    path.join(DIST, 'catalog', 'series', 'anilist-recently-updated.json'),
+    path.join(DIST, 'catalog', 'series', 'anilist-recently-updated'),
     path.join(DIST, 'catalog', 'anime', 'anilist-anime.json'),
   ];
   for (const p of DYNAMIC_PATHS) {
@@ -291,6 +328,8 @@ async function main() {
     { catalogId: 'anilist-season',   query: SEASON_QUERY, baseVars: { season, seasonYear: year } },
     { catalogId: 'anilist-popular',  query: POPULAR_QUERY },
     { catalogId: 'anilist-top',      query: TOP_QUERY, pages: 1 },
+    { catalogId: 'anilist-recently-updated', query: RECENTLY_UPDATED_QUERY, pages: 1, airing: true,
+      baseVars: { airingAt_greater: Math.floor(Date.now() / 1000) - 7 * 24 * 60 * 60, airingAt_lesser: Math.floor(Date.now() / 1000) } },
 
     // ── Anime discover catalog (type: anime) — one page per filter ─────────────
     // Default (no filter)

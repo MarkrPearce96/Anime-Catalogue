@@ -38,6 +38,12 @@ const manifest = {
       extra: [{ name: 'skip', isRequired: false }]
     },
     {
+      type: 'series',
+      id: 'anilist-recently-updated',
+      name: 'Recently Updated',
+      extra: [{ name: 'skip', isRequired: false }]
+    },
+    {
       type: 'anime',
       id: 'anilist-anime',
       name: 'Anime',
