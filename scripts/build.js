@@ -18,10 +18,10 @@ const path = require('path');
 const { initOfflineDb }    = require('../src/mapping/offlineDb');
 const { initFribbDb, getTmdbId } = require('../src/mapping/fribbDb');
 const { resolveStremioId } = require('../src/mapping/idMapper');
-const { queryPage, queryAiringSchedule } = require('../src/anilist/client');
+const { queryPage, queryAiringSchedule, queryMedia } = require('../src/anilist/client');
 const {
   TRENDING_QUERY, SEASON_QUERY, POPULAR_QUERY, TOP_QUERY, ANIME_DISCOVER_QUERY,
-  RECENTLY_UPDATED_QUERY
+  RECENTLY_UPDATED_QUERY, MEDIA_META_QUERY
 } = require('../src/anilist/queries');
 const { buildMetaPreview, buildFullMeta, getCurrentSeason } = require('../src/utils/anilistToMeta');
 const { fetchTmdbSeries, fetchTmdbAllEpisodes, fetchTmdbExternalIds, fetchTmdbAggregateCredits, buildMetaFromTmdb } = require('../src/tmdb/client');
@@ -241,10 +241,18 @@ async function buildAllMetas(allMediaMap) {
       }
     }
 
-    // Fallback: AniList data (no episode list)
-    const meta = buildFullMeta(media, stremioId);
-    writeMetaAllTypes(meta, stremioId);
+    // Fallback: AniList enriched data (characters, staff, relations, recommendations)
+    try {
+      const fullMedia = await queryMedia(MEDIA_META_QUERY, { id: media.id });
+      const meta = buildFullMeta(fullMedia || media, stremioId);
+      writeMetaAllTypes(meta, stremioId);
+    } catch (err) {
+      logger.warn(`  enriched query failed for ${stremioId}: ${err.message} — using catalog data`);
+      const meta = buildFullMeta(media, stremioId);
+      writeMetaAllTypes(meta, stremioId);
+    }
     fallbackCount++;
+    await sleep(800);
   }
 
   logger.info(`  meta files: ${tmdbCount} from TMDB, ${fallbackCount} from AniList fallback, ${skippedCount} skipped (cached)`);

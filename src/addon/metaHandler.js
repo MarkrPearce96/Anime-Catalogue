@@ -1,7 +1,7 @@
 'use strict';
 
 const { queryMedia }    = require('../anilist/client');
-const { MEDIA_BY_ID_QUERY } = require('../anilist/queries');
+const { MEDIA_META_QUERY } = require('../anilist/queries');
 const { buildFullMeta, buildVideosFromKitsuEpisodes } = require('../utils/anilistToMeta');
 const { fetchKitsuEpisodes } = require('../kitsu/client');
 const { fetchTmdbSeries, fetchTmdbAllEpisodes, fetchTmdbExternalIds, fetchTmdbAggregateCredits, buildMetaFromTmdb } = require('../tmdb/client');
@@ -77,7 +77,7 @@ async function fetchMeta(id) {
 
   let media = null;
   try {
-    media = await queryMedia(MEDIA_BY_ID_QUERY, { id: anilistId });
+    media = await queryMedia(MEDIA_META_QUERY, { id: anilistId });
   } catch (err) {
     logger.error(`metaHandler: AniList query failed for ${id}:`, err.message);
     return null;

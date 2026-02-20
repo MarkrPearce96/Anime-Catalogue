@@ -136,6 +136,84 @@ function buildFullMeta(media, stremioId) {
     });
   }
 
+  // Characters & Voice Actors
+  if (media.characters && media.characters.edges) {
+    for (const edge of media.characters.edges) {
+      if (edge.node && edge.node.name && edge.node.name.full) {
+        meta.links.push({
+          name: edge.node.name.full,
+          category: 'Characters',
+          url: edge.node.siteUrl || undefined
+        });
+      }
+      if (edge.voiceActors) {
+        for (const va of edge.voiceActors) {
+          if (va.name && va.name.full) {
+            meta.links.push({
+              name: va.name.full,
+              category: 'Voice Actors',
+              url: va.siteUrl || undefined
+            });
+          }
+        }
+      }
+    }
+  }
+
+  // Staff
+  if (media.staff && media.staff.edges) {
+    for (const edge of media.staff.edges) {
+      if (edge.node && edge.node.name && edge.node.name.full) {
+        meta.links.push({
+          name: edge.node.name.full,
+          category: 'Staff',
+          url: edge.node.siteUrl || undefined
+        });
+      }
+    }
+  }
+
+  // Relations (anime only)
+  if (media.relations && media.relations.edges) {
+    const relationLabels = {
+      SEQUEL: 'Sequel',
+      PREQUEL: 'Prequel',
+      SIDE_STORY: 'Side Story',
+      PARENT: 'Parent',
+      SPIN_OFF: 'Spin-Off',
+      ALTERNATIVE: 'Alternative',
+      SUMMARY: 'Summary',
+      OTHER: 'Other',
+      CHARACTER: 'Character',
+      COMPILATION: 'Compilation',
+      CONTAINS: 'Contains'
+    };
+    for (const edge of media.relations.edges) {
+      if (!edge.node || edge.node.type !== 'ANIME') continue;
+      const label = relationLabels[edge.relationType] || edge.relationType;
+      const title = (edge.node.title && (edge.node.title.english || edge.node.title.romaji)) || 'Unknown';
+      meta.links.push({
+        name: title,
+        category: label,
+        url: edge.node.siteUrl || undefined
+      });
+    }
+  }
+
+  // Recommendations
+  if (media.recommendations && media.recommendations.edges) {
+    for (const edge of media.recommendations.edges) {
+      const rec = edge.node && edge.node.mediaRecommendation;
+      if (!rec || rec.type !== 'ANIME') continue;
+      const title = (rec.title && (rec.title.english || rec.title.romaji)) || 'Unknown';
+      meta.links.push({
+        name: title,
+        category: 'Recommendations',
+        url: rec.siteUrl || undefined
+      });
+    }
+  }
+
   // Status
   if (media.status) {
     const statusMap = {
