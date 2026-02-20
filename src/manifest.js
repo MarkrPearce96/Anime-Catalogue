@@ -74,24 +74,6 @@ const manifest = {
         },
         { name: 'skip', isRequired: false }
       ]
-    },
-    {
-      type: 'series',
-      id: 'anilist-search',
-      name: 'Anime Catalogue',
-      extra: [
-        { name: 'search', isRequired: true },
-        { name: 'skip', isRequired: false }
-      ]
-    },
-    {
-      type: 'movie',
-      id: 'anilist-search',
-      name: 'Anime Catalogue',
-      extra: [
-        { name: 'search', isRequired: true },
-        { name: 'skip', isRequired: false }
-      ]
     }
   ]
 };

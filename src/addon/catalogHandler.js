@@ -7,8 +7,7 @@ const {
   POPULAR_QUERY,
   TOP_QUERY,
   ANIME_DISCOVER_QUERY,
-  RECENTLY_UPDATED_QUERY,
-  SEARCH_QUERY
+  RECENTLY_UPDATED_QUERY
 } = require('../anilist/queries');
 
 // Maps Stremio display values → AniList enum values for the anime discover catalog
@@ -27,7 +26,6 @@ const TTL = {
   'anilist-top':               24 * 60 * 60,   // 24 hours
   'anilist-anime':             6 * 60 * 60,    // 6 hours
   'anilist-recently-updated':  30 * 60,        // 30 minutes
-  'anilist-search':            60 * 60,        // 1 hour
 };
 
 /**
@@ -58,10 +56,6 @@ function buildVariables(catalogId, extra, page) {
     if (extra.year)   vars.year   = parseInt(extra.year, 10);
   }
 
-  if (catalogId === 'anilist-search' && extra) {
-    if (extra.search) vars.search = extra.search;
-  }
-
   if (catalogId === 'anilist-recently-updated') {
     const now = Math.floor(Date.now() / 1000);
     vars.airingAt_greater = now - 7 * 24 * 60 * 60; // 7 days ago
@@ -82,7 +76,6 @@ function pickQuery(catalogId) {
     case 'anilist-top':      return TOP_QUERY;
     case 'anilist-anime':              return ANIME_DISCOVER_QUERY;
     case 'anilist-recently-updated':   return RECENTLY_UPDATED_QUERY;
-    case 'anilist-search':             return SEARCH_QUERY;
     default: return null;
   }
 }
@@ -94,15 +87,14 @@ function pickQuery(catalogId) {
  * @param {object} extra  - { skip?, genre? }
  * @returns {Promise<{ metas, cacheMaxAge, staleRevalidate, staleError }>}
  */
-async function fetchCatalog(catalogId, extra = {}, type) {
+async function fetchCatalog(catalogId, extra = {}) {
   const page = skipToPage(extra.skip);
   const extraKey = Object.entries(extra)
     .filter(([k]) => k !== 'skip')
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([k, v]) => `${k}=${v}`)
     .join('&');
-  const typeKey = (catalogId === 'anilist-search' && type) ? `:${type}` : '';
-  const cacheKey = `catalog:${catalogId}:${page}:${extraKey}${typeKey}`;
+  const cacheKey = `catalog:${catalogId}:${page}:${extraKey}`;
   const ttl = TTL[catalogId] || 3600;
 
   // Cache hit
@@ -143,17 +135,12 @@ async function fetchCatalog(catalogId, extra = {}, type) {
   // Items from the anime discover catalog get type 'anime' so they appear under
   // the Anime section of the Discovery tab, separate from Movies and Series.
   const overrideType = catalogId === 'anilist-anime' ? 'anime' : undefined;
-  let metas = await Promise.all(
+  const metas = await Promise.all(
     mediaList.map(async media => {
       const stremioId = await resolveStremioId(media);
       return buildMetaPreview(media, stremioId, overrideType);
     })
   );
-
-  // Filter search results by Stremio type so series and movies appear in separate rows
-  if (catalogId === 'anilist-search' && type) {
-    metas = metas.filter(m => m.type === type);
-  }
 
   const result = {
     metas,
@@ -173,7 +160,7 @@ async function fetchCatalog(catalogId, extra = {}, type) {
 function defineCatalogHandler(builder) {
   builder.defineCatalogHandler(async ({ type, id, extra }) => {
     try {
-      return await fetchCatalog(id, extra || {}, type);
+      return await fetchCatalog(id, extra || {});
     } catch (err) {
       logger.error(`catalogHandler error [${id}]:`, err.message);
       return { metas: [] };

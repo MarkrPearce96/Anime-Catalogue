@@ -134,20 +134,6 @@ const RECENTLY_UPDATED_QUERY = `
   }
 `;
 
-const SEARCH_QUERY = `
-  query SearchAnime($search: String, $page: Int, $perPage: Int) {
-    Page(page: $page, perPage: $perPage) {
-      pageInfo {
-        hasNextPage
-        total
-      }
-      media(type: ANIME, isAdult: false, search: $search, sort: SEARCH_MATCH) {
-        ${MEDIA_FIELDS}
-      }
-    }
-  }
-`;
-
 const MEDIA_BY_ID_QUERY = `
   query MediaById($id: Int) {
     Media(id: $id, type: ANIME) {
@@ -163,6 +149,5 @@ module.exports = {
   TOP_QUERY,
   ANIME_DISCOVER_QUERY,
   RECENTLY_UPDATED_QUERY,
-  SEARCH_QUERY,
   MEDIA_BY_ID_QUERY
 };
