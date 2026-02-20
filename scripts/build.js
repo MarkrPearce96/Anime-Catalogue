@@ -23,7 +23,7 @@ const {
   TRENDING_QUERY, SEASON_QUERY, POPULAR_QUERY, TOP_QUERY, ANIME_DISCOVER_QUERY,
   RECENTLY_UPDATED_QUERY, MEDIA_META_QUERY
 } = require('../src/anilist/queries');
-const { buildMetaPreview, buildFullMeta, getCurrentSeason } = require('../src/utils/anilistToMeta');
+const { buildMetaPreview, buildFullMeta, buildEnrichmentLinks, getCurrentSeason } = require('../src/utils/anilistToMeta');
 const { fetchTmdbSeries, fetchTmdbAllEpisodes, fetchTmdbExternalIds, fetchTmdbAggregateCredits, buildMetaFromTmdb } = require('../src/tmdb/client');
 const manifest = require('../src/manifest');
 const logger   = require('../src/utils/logger');
@@ -231,9 +231,21 @@ async function buildAllMetas(allMediaMap) {
           const imdbId  = (externalIds && externalIds.imdb_id) || null;
           const episodes = await fetchTmdbAllEpisodes(tmdbId, series.number_of_seasons || 1);
           const meta = buildMetaFromTmdb(series, episodes, stremioId, imdbId, aggregateCredits);
+
+          // Enrich TMDB meta with AniList characters, staff, relations, recommendations
+          try {
+            const aniMedia = await queryMedia(MEDIA_META_QUERY, { id: anilistId });
+            if (aniMedia) {
+              if (!meta.links) meta.links = [];
+              meta.links.push(...buildEnrichmentLinks(aniMedia));
+            }
+          } catch (err) {
+            logger.warn(`  AniList enrichment failed for ${stremioId}: ${err.message}`);
+          }
+
           writeMetaAllTypes(meta, stremioId);
           tmdbCount++;
-          await sleep(150); // respect TMDB rate limit
+          await sleep(800); // respect AniList + TMDB rate limits
           continue;
         }
       } catch (err) {

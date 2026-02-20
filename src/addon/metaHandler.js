@@ -2,7 +2,7 @@
 
 const { queryMedia }    = require('../anilist/client');
 const { MEDIA_META_QUERY } = require('../anilist/queries');
-const { buildFullMeta, buildVideosFromKitsuEpisodes } = require('../utils/anilistToMeta');
+const { buildFullMeta, buildEnrichmentLinks, buildVideosFromKitsuEpisodes } = require('../utils/anilistToMeta');
 const { fetchKitsuEpisodes } = require('../kitsu/client');
 const { fetchTmdbSeries, fetchTmdbAllEpisodes, fetchTmdbExternalIds, fetchTmdbAggregateCredits, buildMetaFromTmdb } = require('../tmdb/client');
 const { getAnilistId, getKitsuId } = require('../mapping/offlineDb');
@@ -59,6 +59,20 @@ async function fetchMeta(id) {
         const imdbId  = (externalIds && externalIds.imdb_id) || null;
         const episodes = await fetchTmdbAllEpisodes(tmdbId, series.number_of_seasons || 1);
         const meta = buildMetaFromTmdb(series, episodes, id, imdbId, aggregateCredits);
+
+        // Enrich TMDB meta with AniList characters, staff, relations, recommendations
+        if (anilistId) {
+          try {
+            const aniMedia = await queryMedia(MEDIA_META_QUERY, { id: anilistId });
+            if (aniMedia) {
+              if (!meta.links) meta.links = [];
+              meta.links.push(...buildEnrichmentLinks(aniMedia));
+            }
+          } catch (err) {
+            logger.warn(`  AniList enrichment failed for ${id}: ${err.message}`);
+          }
+        }
+
         const result = { meta, cacheMaxAge: META_TTL, staleRevalidate: META_TTL * 2, staleError: 86400 };
         memCache.set(cacheKey, result, META_TTL);
         logger.info(`  meta sourced from TMDB (tmdbId: ${tmdbId}${imdbId ? ', imdbId: ' + imdbId : ''})`);
