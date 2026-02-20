@@ -7,7 +7,8 @@ const {
   POPULAR_QUERY,
   TOP_QUERY,
   ANIME_DISCOVER_QUERY,
-  RECENTLY_UPDATED_QUERY
+  RECENTLY_UPDATED_QUERY,
+  SEARCH_QUERY
 } = require('../anilist/queries');
 
 // Maps Stremio display values → AniList enum values for the anime discover catalog
@@ -26,6 +27,7 @@ const TTL = {
   'anilist-top':               24 * 60 * 60,   // 24 hours
   'anilist-anime':             6 * 60 * 60,    // 6 hours
   'anilist-recently-updated':  30 * 60,        // 30 minutes
+  'anilist-search':            60 * 60,        // 1 hour
 };
 
 /**
@@ -56,6 +58,10 @@ function buildVariables(catalogId, extra, page) {
     if (extra.year)   vars.year   = parseInt(extra.year, 10);
   }
 
+  if (catalogId === 'anilist-search' && extra) {
+    if (extra.search) vars.search = extra.search;
+  }
+
   if (catalogId === 'anilist-recently-updated') {
     const now = Math.floor(Date.now() / 1000);
     vars.airingAt_greater = now - 7 * 24 * 60 * 60; // 7 days ago
@@ -76,6 +82,7 @@ function pickQuery(catalogId) {
     case 'anilist-top':      return TOP_QUERY;
     case 'anilist-anime':              return ANIME_DISCOVER_QUERY;
     case 'anilist-recently-updated':   return RECENTLY_UPDATED_QUERY;
+    case 'anilist-search':             return SEARCH_QUERY;
     default: return null;
   }
 }
