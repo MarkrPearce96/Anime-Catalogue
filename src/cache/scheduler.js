@@ -2,6 +2,7 @@
 
 const { fetchCatalog } = require('../addon/catalogHandler');
 const { refreshOfflineDb } = require('../mapping/offlineDb');
+const { refreshFribbDb } = require('../mapping/fribbDb');
 const memCache = require('./memCache');
 const logger = require('../utils/logger');
 
@@ -51,6 +52,14 @@ function startScheduler() {
     }, 24 * 60 * 60 * 1000)
   );
 
+  // --- Fribb DB: re-download every 24 hours ---
+  INTERVALS.push(
+    setInterval(async () => {
+      logger.info('scheduler: refreshing fribb DB');
+      await refreshFribbDb();
+    }, 24 * 60 * 60 * 1000)
+  );
+
   // --- Evict expired cache entries every 30 minutes ---
   INTERVALS.push(
     setInterval(() => {
@@ -63,7 +72,7 @@ function startScheduler() {
     }, 30 * 60 * 1000)
   );
 
-  logger.info('scheduler: started (trending 1h, season 6h, recently-updated 30m, offline DB 24h, eviction 30m)');
+  logger.info('scheduler: started (trending 1h, season 6h, recently-updated 30m, offline DB 24h, fribb DB 24h, eviction 30m)');
 }
 
 /**
