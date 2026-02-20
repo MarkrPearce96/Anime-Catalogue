@@ -11,7 +11,7 @@ const manifest = {
   description: 'Trending, seasonal, and popular anime from AniList.',
   resources: ['catalog', 'meta'],
   types: ['series', 'movie', 'anime'],
-  idPrefixes: ['kitsu:', 'anilist:'],
+  idPrefixes: ['tmdb:', 'kitsu:', 'anilist:'],
   catalogs: [
     {
       type: 'series',

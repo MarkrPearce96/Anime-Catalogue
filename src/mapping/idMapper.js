@@ -1,6 +1,7 @@
 'use strict';
 
 const { getKitsuId } = require('./offlineDb');
+const { getTmdbId } = require('./fribbDb');
 const { searchKitsuId } = require('../kitsu/client');
 const { getTitle } = require('../utils/anilistToMeta');
 const logger = require('../utils/logger');
@@ -13,9 +14,10 @@ const resolved = new Map();
  *
  * Resolution chain:
  *   1. In-process cache
- *   2. offlineDb numeric Kitsu ID  → "kitsu:{numeric}"
- *   3. Kitsu API search by title   → "kitsu:{numeric}" or "kitsu:{slug}"
- *   4. Fallback                    → "anilist:{id}"
+ *   2. fribbDb TMDB ID             → "tmdb:{numeric}"
+ *   3. offlineDb numeric Kitsu ID  → "kitsu:{numeric}"
+ *   4. Kitsu API search by title   → "kitsu:{numeric}" or "kitsu:{slug}"
+ *   5. Fallback                    → "anilist:{id}"
  *
  * @param {object} media  - AniList media object (must have .id and .title)
  * @returns {Promise<string>}
@@ -28,7 +30,16 @@ async function resolveStremioId(media) {
     return resolved.get(anilistId);
   }
 
-  // 2. Offline DB lookup
+  // 2. Fribb DB: AniList → TMDB
+  const tmdbId = getTmdbId(anilistId);
+  if (tmdbId) {
+    const stremioId = `tmdb:${tmdbId}`;
+    resolved.set(anilistId, stremioId);
+    logger.debug(`idMapper: ${anilistId} → ${stremioId} (Fribb DB)`);
+    return stremioId;
+  }
+
+  // 3. Offline DB lookup
   const kitsuNumeric = getKitsuId(anilistId);
   if (kitsuNumeric) {
     const stremioId = `kitsu:${kitsuNumeric}`;
@@ -37,7 +48,7 @@ async function resolveStremioId(media) {
     return stremioId;
   }
 
-  // 3. Kitsu API search
+  // 4. Kitsu API search
   const title = getTitle(media.title);
   const kitsuApiId = await searchKitsuId(title);
   if (kitsuApiId) {
@@ -47,7 +58,7 @@ async function resolveStremioId(media) {
     return stremioId;
   }
 
-  // 4. Fallback — our own meta handler will serve this
+  // 5. Fallback — our own meta handler will serve this
   const stremioId = `anilist:${anilistId}`;
   resolved.set(anilistId, stremioId);
   logger.debug(`idMapper: ${anilistId} → ${stremioId} (fallback)`);

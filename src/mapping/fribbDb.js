@@ -10,18 +10,24 @@ const FRIBB_PATH = path.join(__dirname, '../../data/anime-list-full.json');
 
 // Map<anilistId (number), tmdbId (number)>
 const anilistToTmdb = new Map();
+// Map<tmdbId (number), anilistId (number)>
+const tmdbToAnilist = new Map();
 
 function parseDatabase(json) {
   anilistToTmdb.clear();
+  tmdbToAnilist.clear();
   const entries = Array.isArray(json) ? json : [];
 
   for (const entry of entries) {
     if (entry.anilist_id && entry.themoviedb_id) {
-      anilistToTmdb.set(Number(entry.anilist_id), Number(entry.themoviedb_id));
+      const anilistId = Number(entry.anilist_id);
+      const tmdbId = Number(entry.themoviedb_id);
+      anilistToTmdb.set(anilistId, tmdbId);
+      tmdbToAnilist.set(tmdbId, anilistId);
     }
   }
 
-  logger.info(`fribbDb: indexed ${anilistToTmdb.size.toLocaleString()} AniList→TMDB mappings`);
+  logger.info(`fribbDb: indexed ${anilistToTmdb.size.toLocaleString()} AniList↔TMDB mappings`);
 }
 
 async function downloadDatabase() {
@@ -69,4 +75,8 @@ function getTmdbId(anilistId) {
   return anilistToTmdb.get(Number(anilistId)) || null;
 }
 
-module.exports = { initFribbDb, refreshFribbDb, getTmdbId };
+function getAnilistIdFromTmdb(tmdbId) {
+  return tmdbToAnilist.get(Number(tmdbId)) || null;
+}
+
+module.exports = { initFribbDb, refreshFribbDb, getTmdbId, getAnilistIdFromTmdb };

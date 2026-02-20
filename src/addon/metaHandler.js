@@ -6,7 +6,7 @@ const { buildFullMeta, buildVideosFromKitsuEpisodes } = require('../utils/anilis
 const { fetchKitsuEpisodes } = require('../kitsu/client');
 const { fetchTmdbSeries, fetchTmdbAllEpisodes, fetchTmdbExternalIds, fetchTmdbAggregateCredits, buildMetaFromTmdb } = require('../tmdb/client');
 const { getAnilistId, getKitsuId } = require('../mapping/offlineDb');
-const { getTmdbId }     = require('../mapping/fribbDb');
+const { getTmdbId, getAnilistIdFromTmdb } = require('../mapping/fribbDb');
 const memCache          = require('../cache/memCache');
 const logger            = require('../utils/logger');
 
@@ -32,20 +32,27 @@ async function fetchMeta(id) {
   let anilistId      = null;
   let kitsuNumericId = null;
 
-  if (id.startsWith('kitsu:')) {
+  let tmdbId = null;
+
+  if (id.startsWith('tmdb:')) {
+    const m = id.match(/^tmdb:(\d+)$/);
+    if (!m) return null;
+    tmdbId         = parseInt(m[1], 10);
+    anilistId      = getAnilistIdFromTmdb(tmdbId);
+    kitsuNumericId = anilistId ? getKitsuId(anilistId) : null;
+  } else if (id.startsWith('kitsu:')) {
     kitsuNumericId = id.slice('kitsu:'.length);
     anilistId      = getAnilistId(kitsuNumericId);
+    tmdbId         = anilistId ? getTmdbId(anilistId) : null;
   } else if (id.startsWith('anilist:')) {
     const m = id.match(/^anilist:(\d+)$/);
     if (!m) return null;
     anilistId      = parseInt(m[1], 10);
     kitsuNumericId = getKitsuId(anilistId);
+    tmdbId         = getTmdbId(anilistId);
   } else {
     return null;
   }
-
-  // --- Try TMDB first (best episode data + thumbnails) ---
-  const tmdbId = anilistId ? getTmdbId(anilistId) : null;
 
   if (tmdbId && process.env.TMDB_API_KEY) {
     try {
@@ -104,7 +111,7 @@ async function fetchMeta(id) {
 
 function defineMetaHandler(builder) {
   builder.defineMetaHandler(async ({ type, id }) => {
-    if (!id.startsWith('kitsu:') && !id.startsWith('anilist:')) return null;
+    if (!id.startsWith('tmdb:') && !id.startsWith('kitsu:') && !id.startsWith('anilist:')) return null;
     try {
       const result = await fetchMeta(id);
       return result || { meta: null };
