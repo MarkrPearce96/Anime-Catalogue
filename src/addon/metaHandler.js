@@ -18,8 +18,8 @@ const META_TTL = 24 * 60 * 60; // 24 hours
  *   2. Fall back to AniList + Kitsu episodes
  *   3. Fall back to AniList only
  */
-async function fetchMeta(id) {
-  const cacheKey = `meta:${id}`;
+async function fetchMeta(id, requestedType) {
+  const cacheKey = `meta:${requestedType || 'series'}:${id}`;
   const cached = memCache.get(cacheKey);
   if (cached) {
     logger.info(`meta cache hit: ${cacheKey}`);
@@ -65,7 +65,7 @@ async function fetchMeta(id) {
       if (series) {
         const imdbId  = (externalIds && externalIds.imdb_id) || null;
         const episodes = await fetchTmdbAllEpisodes(tmdbId, series.number_of_seasons || 1);
-        const meta = buildMetaFromTmdb(series, episodes, id, imdbId, aggregateCredits);
+        const meta = buildMetaFromTmdb(series, episodes, id, imdbId, aggregateCredits, requestedType);
         const result = { meta, cacheMaxAge: META_TTL, staleRevalidate: META_TTL * 2, staleError: 86400 };
         memCache.set(cacheKey, result, META_TTL);
         logger.info(`  meta sourced from TMDB (tmdbId: ${tmdbId}${imdbId ? ', imdbId: ' + imdbId : ''})`);
@@ -91,7 +91,7 @@ async function fetchMeta(id) {
   }
   if (!media) return null;
 
-  const meta = buildFullMeta(media, id);
+  const meta = buildFullMeta(media, id, requestedType);
 
   if (kitsuNumericId && meta.type === 'series') {
     try {
@@ -113,7 +113,7 @@ function defineMetaHandler(builder) {
   builder.defineMetaHandler(async ({ type, id }) => {
     if (!id.startsWith('tmdb:') && !id.startsWith('kitsu:') && !id.startsWith('anilist:')) return null;
     try {
-      const result = await fetchMeta(id);
+      const result = await fetchMeta(id, type);
       return result || { meta: null };
     } catch (err) {
       logger.error(`metaHandler error [${id}]:`, err.message);

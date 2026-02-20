@@ -111,7 +111,7 @@ async function fetchTmdbExternalIds(tmdbId) {
  *                                    so Torrentio routes streams via its IMDB path (better coverage)
  * @returns {object}
  */
-function buildMetaFromTmdb(series, allEpisodes, stremioId, imdbId, aggregateCredits) {
+function buildMetaFromTmdb(series, allEpisodes, stremioId, imdbId, aggregateCredits, requestedType) {
   const statusMap = {
     'Returning Series': 'Continuing',
     'Ended':            'Ended',
@@ -122,7 +122,7 @@ function buildMetaFromTmdb(series, allEpisodes, stremioId, imdbId, aggregateCred
 
   const meta = {
     id:          stremioId,
-    type:        'series',
+    type:        requestedType || 'series',
     name:        series.name,
     poster:      poster(series.poster_path),
     background:  backdrop(series.backdrop_path),

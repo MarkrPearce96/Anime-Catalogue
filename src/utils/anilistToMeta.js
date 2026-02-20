@@ -95,8 +95,9 @@ function buildMetaPreview(media, stremioId, overrideType) {
  * @param {string} stremioId
  * @returns {object}
  */
-function buildFullMeta(media, stremioId) {
+function buildFullMeta(media, stremioId, requestedType) {
   const meta = buildMetaPreview(media, stremioId);
+  if (requestedType) meta.type = requestedType;
 
   // Runtime (minutes per episode)
   if (media.duration) {
