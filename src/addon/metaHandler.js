@@ -20,18 +20,10 @@ const META_TTL = 24 * 60 * 60; // 24 hours
  */
 async function fetchMeta(id, requestedType) {
   const cacheKey = `meta:${requestedType || 'series'}:${id}`;
-  const cached = memCache.get(cacheKey);
-  if (cached) {
-    logger.info(`meta cache hit: ${cacheKey}`);
-    return cached;
-  }
-
-  logger.info(`meta cache miss: ${cacheKey}`);
 
   // --- Resolve anilistId and kitsuNumericId from the incoming ID ---
   let anilistId      = null;
   let kitsuNumericId = null;
-
   let tmdbId = null;
 
   if (id.startsWith('tmdb:')) {
@@ -54,59 +46,57 @@ async function fetchMeta(id, requestedType) {
     return null;
   }
 
-  if (tmdbId && process.env.TMDB_API_KEY) {
-    try {
-      // Fetch series details, external IDs, and aggregate cast in parallel
-      const [series, externalIds, aggregateCredits] = await Promise.all([
-        fetchTmdbSeries(tmdbId),
-        fetchTmdbExternalIds(tmdbId),
-        fetchTmdbAggregateCredits(tmdbId),
-      ]);
-      if (series) {
-        const imdbId  = (externalIds && externalIds.imdb_id) || null;
-        const episodes = await fetchTmdbAllEpisodes(tmdbId, series.number_of_seasons || 1);
-        const meta = buildMetaFromTmdb(series, episodes, id, imdbId, aggregateCredits, requestedType);
-        const result = { meta, cacheMaxAge: META_TTL, staleRevalidate: META_TTL * 2, staleError: 86400 };
-        memCache.set(cacheKey, result, META_TTL);
-        logger.info(`  meta sourced from TMDB (tmdbId: ${tmdbId}${imdbId ? ', imdbId: ' + imdbId : ''})`);
-        return result;
+  return memCache.getOrFetch(cacheKey, META_TTL, async () => {
+    logger.info(`meta cache miss: ${cacheKey}`);
+
+    if (tmdbId && process.env.TMDB_API_KEY) {
+      try {
+        const [series, externalIds, aggregateCredits] = await Promise.all([
+          fetchTmdbSeries(tmdbId),
+          fetchTmdbExternalIds(tmdbId),
+          fetchTmdbAggregateCredits(tmdbId),
+        ]);
+        if (series) {
+          const imdbId  = (externalIds && externalIds.imdb_id) || null;
+          const episodes = await fetchTmdbAllEpisodes(tmdbId, series.number_of_seasons || 1);
+          const meta = buildMetaFromTmdb(series, episodes, id, imdbId, aggregateCredits, requestedType);
+          logger.info(`  meta sourced from TMDB (tmdbId: ${tmdbId}${imdbId ? ', imdbId: ' + imdbId : ''})`);
+          return { meta, cacheMaxAge: META_TTL, staleRevalidate: META_TTL * 2, staleError: 86400 };
+        }
+      } catch (err) {
+        logger.warn(`  TMDB meta failed for ${id}: ${err.message} — falling back`);
       }
-    } catch (err) {
-      logger.warn(`  TMDB meta failed for ${id}: ${err.message} — falling back`);
     }
-  }
 
-  // --- Fall back: AniList meta + Kitsu episodes ---
-  if (!anilistId) {
-    logger.warn(`metaHandler: could not resolve anilistId for ${id}`);
-    return null;
-  }
+    if (!anilistId) {
+      logger.warn(`metaHandler: could not resolve anilistId for ${id}`);
+      return null;
+    }
 
-  let media = null;
-  try {
-    media = await queryMedia(MEDIA_BY_ID_QUERY, { id: anilistId });
-  } catch (err) {
-    logger.error(`metaHandler: AniList query failed for ${id}:`, err.message);
-    return null;
-  }
-  if (!media) return null;
-
-  const meta = buildFullMeta(media, id, requestedType);
-
-  if (kitsuNumericId && meta.type === 'series') {
+    let media = null;
     try {
-      const episodes = await fetchKitsuEpisodes(kitsuNumericId);
-      if (episodes.length > 0) {
-        meta.videos = buildVideosFromKitsuEpisodes(episodes, id);
-      }
+      media = await queryMedia(MEDIA_BY_ID_QUERY, { id: anilistId });
     } catch (err) {
-      logger.warn(`metaHandler: Kitsu episodes failed for ${id}:`, err.message);
+      logger.error(`metaHandler: AniList query failed for ${id}:`, err.message);
+      return null;
     }
-  }
+    if (!media) return null;
 
-  const result = { meta, cacheMaxAge: META_TTL, staleRevalidate: META_TTL * 2, staleError: 86400 };
-  memCache.set(cacheKey, result, META_TTL);
-  return result;
+    const meta = buildFullMeta(media, id, requestedType);
+
+    if (kitsuNumericId && meta.type === 'series') {
+      try {
+        const episodes = await fetchKitsuEpisodes(kitsuNumericId);
+        if (episodes.length > 0) {
+          meta.videos = buildVideosFromKitsuEpisodes(episodes, id);
+        }
+      } catch (err) {
+        logger.warn(`metaHandler: Kitsu episodes failed for ${id}:`, err.message);
+      }
+    }
+
+    return { meta, cacheMaxAge: META_TTL, staleRevalidate: META_TTL * 2, staleError: 86400 };
+  });
 }
 
 function defineMetaHandler(builder) {

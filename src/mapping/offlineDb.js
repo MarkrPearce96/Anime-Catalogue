@@ -132,4 +132,8 @@ function getAnilistId(kitsuId) {
   return kitsuToAnilist.get(String(kitsuId)) || null;
 }
 
-module.exports = { initOfflineDb, refreshOfflineDb, getKitsuId, getAnilistId };
+function isLoaded() {
+  return anilistToKitsu.size > 0;
+}
+
+module.exports = { initOfflineDb, refreshOfflineDb, getKitsuId, getAnilistId, isLoaded };

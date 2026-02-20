@@ -1,12 +1,15 @@
 'use strict';
 
-const { addonBuilder, serveHTTP } = require('stremio-addon-sdk');
+const express = require('express');
+const { addonBuilder, getRouter } = require('stremio-addon-sdk');
+const landingTemplate = require('stremio-addon-sdk/src/landingTemplate');
 const manifest = require('./manifest');
-const { initOfflineDb } = require('./mapping/offlineDb');
-const { initFribbDb }   = require('./mapping/fribbDb');
+const { initOfflineDb, isLoaded: offlineDbLoaded } = require('./mapping/offlineDb');
+const { initFribbDb, isLoaded: fribbDbLoaded }     = require('./mapping/fribbDb');
 const { defineCatalogHandler } = require('./addon/catalogHandler');
 const { defineMetaHandler } = require('./addon/metaHandler');
-const { startScheduler } = require('./cache/scheduler');
+const { startScheduler, stopScheduler } = require('./cache/scheduler');
+const memCache = require('./cache/memCache');
 const logger = require('./utils/logger');
 
 const PORT = parseInt(process.env.PORT, 10) || 7070;
@@ -45,10 +48,43 @@ async function main() {
   // 4. Start background scheduler (pre-warm caches, periodic refresh)
   startScheduler();
 
-  // 5. Start HTTP server
-  serveHTTP(builder.getInterface(), { port: PORT });
-  logger.info(`Addon listening at http://localhost:${PORT}`);
-  logger.info(`Install URL: http://localhost:${PORT}/manifest.json`);
+  // 5. Build Express app with addon router and custom routes
+  const app = express();
+
+  // Health check endpoint (before addon router so it's not blocked)
+  app.get('/health', (_req, res) => {
+    res.json({
+      status: 'ok',
+      cache: memCache.size(),
+      offlineDb: offlineDbLoaded(),
+      fribbDb: fribbDbLoaded(),
+      tmdb: !!process.env.TMDB_API_KEY
+    });
+  });
+
+  // Landing page
+  const landingHTML = landingTemplate(manifest);
+  app.get('/', (_req, res) => {
+    res.setHeader('content-type', 'text/html');
+    res.end(landingHTML);
+  });
+
+  // Addon routes (catalog, meta, manifest, etc.)
+  app.use(getRouter(builder.getInterface()));
+
+  app.listen(PORT, () => {
+    logger.info(`Addon listening at http://localhost:${PORT}`);
+    logger.info(`Install URL: http://localhost:${PORT}/manifest.json`);
+  });
+
+  // 6. Graceful shutdown
+  function shutdown(signal) {
+    logger.info(`Received ${signal}, shutting down gracefully...`);
+    stopScheduler();
+    process.exit(0);
+  }
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
 main().catch(err => {

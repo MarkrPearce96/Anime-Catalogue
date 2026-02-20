@@ -79,4 +79,8 @@ function getAnilistIdFromTmdb(tmdbId) {
   return tmdbToAnilist.get(Number(tmdbId)) || null;
 }
 
-module.exports = { initFribbDb, refreshFribbDb, getTmdbId, getAnilistIdFromTmdb };
+function isLoaded() {
+  return anilistToTmdb.size > 0;
+}
+
+module.exports = { initFribbDb, refreshFribbDb, getTmdbId, getAnilistIdFromTmdb, isLoaded };

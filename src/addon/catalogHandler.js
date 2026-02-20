@@ -99,60 +99,52 @@ async function fetchCatalog(catalogId, extra = {}) {
   const cacheKey = `catalog:${catalogId}:${page}:${extraKey}`;
   const ttl = TTL[catalogId] || 3600;
 
-  // Cache hit
-  const cached = memCache.get(cacheKey);
-  if (cached) {
-    logger.info(`catalog cache hit: ${cacheKey}`);
-    return cached;
-  }
-
-  logger.info(`catalog cache miss: ${cacheKey} — querying AniList`);
-
   const query = pickQuery(catalogId);
   if (!query) {
     logger.warn(`Unknown catalog ID: ${catalogId}`);
     return { metas: [] };
   }
 
-  const vars = buildVariables(catalogId, extra, page);
+  return memCache.getOrFetch(cacheKey, ttl, async () => {
+    logger.info(`catalog cache miss: ${cacheKey} — querying AniList`);
 
-  let mediaList;
-  if (catalogId === 'anilist-recently-updated') {
-    // Airing schedule returns per-episode entries — deduplicate by media ID
-    const schedules = await queryAiringSchedule(query, vars);
-    const seen = new Set();
-    mediaList = [];
-    for (const schedule of schedules) {
-      if (!schedule.media || schedule.media.isAdult) continue;
-      if (seen.has(schedule.media.id)) continue;
-      seen.add(schedule.media.id);
-      mediaList.push(schedule.media);
+    const vars = buildVariables(catalogId, extra, page);
+
+    let mediaList;
+    if (catalogId === 'anilist-recently-updated') {
+      // Airing schedule returns per-episode entries — deduplicate by media ID
+      const schedules = await queryAiringSchedule(query, vars);
+      const seen = new Set();
+      mediaList = [];
+      for (const schedule of schedules) {
+        if (!schedule.media || schedule.media.isAdult) continue;
+        if (seen.has(schedule.media.id)) continue;
+        seen.add(schedule.media.id);
+        mediaList.push(schedule.media);
+      }
+    } else {
+      const pageData = await queryPage(query, vars);
+      mediaList = (pageData && pageData.media) || [];
     }
-  } else {
-    const pageData = await queryPage(query, vars);
-    mediaList = (pageData && pageData.media) || [];
-  }
 
-  // Resolve all IDs concurrently
-  // Items from the anime discover catalog get type 'anime' so they appear under
-  // the Anime section of the Discovery tab, separate from Movies and Series.
-  const overrideType = catalogId === 'anilist-anime' ? 'anime' : undefined;
-  const metas = await Promise.all(
-    mediaList.map(async media => {
-      const stremioId = await resolveStremioId(media);
-      return buildMetaPreview(media, stremioId, overrideType);
-    })
-  );
+    // Resolve all IDs concurrently
+    // Items from the anime discover catalog get type 'anime' so they appear under
+    // the Anime section of the Discovery tab, separate from Movies and Series.
+    const overrideType = catalogId === 'anilist-anime' ? 'anime' : undefined;
+    const metas = await Promise.all(
+      mediaList.map(async media => {
+        const stremioId = await resolveStremioId(media);
+        return buildMetaPreview(media, stremioId, overrideType);
+      })
+    );
 
-  const result = {
-    metas,
-    cacheMaxAge: ttl,
-    staleRevalidate: ttl * 2,
-    staleError: 86400
-  };
-
-  memCache.set(cacheKey, result, ttl);
-  return result;
+    return {
+      metas,
+      cacheMaxAge: ttl,
+      staleRevalidate: ttl * 2,
+      staleError: 86400
+    };
+  });
 }
 
 /**
