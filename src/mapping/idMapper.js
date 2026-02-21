@@ -9,6 +9,9 @@ const logger = require('../utils/logger');
 // Per-process cache: anilistId → stremioId (never expires — stable mapping)
 const resolved = new Map();
 
+// Track AniList IDs where Kitsu API returned no result, so we don't re-query
+const negativeCache = new Set();
+
 /**
  * Resolve an AniList media object to a Stremio ID string.
  *
@@ -48,14 +51,17 @@ async function resolveStremioId(media) {
     return stremioId;
   }
 
-  // 4. Kitsu API search
-  const title = getTitle(media.title);
-  const kitsuApiId = await searchKitsuId(title);
-  if (kitsuApiId) {
-    const stremioId = `kitsu:${kitsuApiId}`;
-    resolved.set(anilistId, stremioId);
-    logger.debug(`idMapper: ${anilistId} → ${stremioId} (Kitsu API)`);
-    return stremioId;
+  // 4. Kitsu API search (skip if previously returned no result)
+  if (!negativeCache.has(anilistId)) {
+    const title = getTitle(media.title);
+    const kitsuApiId = await searchKitsuId(title);
+    if (kitsuApiId) {
+      const stremioId = `kitsu:${kitsuApiId}`;
+      resolved.set(anilistId, stremioId);
+      logger.debug(`idMapper: ${anilistId} → ${stremioId} (Kitsu API)`);
+      return stremioId;
+    }
+    negativeCache.add(anilistId);
   }
 
   // 5. Fallback — our own meta handler will serve this

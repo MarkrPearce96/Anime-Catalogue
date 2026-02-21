@@ -7,15 +7,37 @@ const sleep = require('../utils/sleep');
 const ANILIST_API = 'https://graphql.anilist.co';
 const PER_PAGE = 100;
 
+// Serial queue to avoid overwhelming AniList's rate limit (~90 req/min)
+const queue = [];
+let processing = false;
+
+function enqueue(query, variables) {
+  return new Promise((resolve, reject) => {
+    queue.push({ query, variables, resolve, reject });
+    if (!processing) processQueue();
+  });
+}
+
+async function processQueue() {
+  processing = true;
+  while (queue.length > 0) {
+    const { query, variables, resolve, reject } = queue.shift();
+    try {
+      const result = await executeQuery(query, variables);
+      resolve(result);
+    } catch (err) {
+      reject(err);
+    }
+  }
+  processing = false;
+}
+
 /**
- * Execute a GraphQL query against AniList with automatic rate-limit retry.
- * AniList allows ~90 requests/min. On 429 we back off and retry once.
- *
- * @param {string} query   - GraphQL query string
- * @param {object} variables
- * @returns {Promise<object>} - parsed data object
+ * Execute a GraphQL query against AniList with automatic rate-limit handling.
+ * Reads X-RateLimit-Remaining / X-RateLimit-Reset headers to proactively
+ * sleep before hitting 429.
  */
-async function anilistQuery(query, variables = {}) {
+async function executeQuery(query, variables) {
   const body = JSON.stringify({ query, variables });
 
   for (let attempt = 1; attempt <= 3; attempt++) {
@@ -61,10 +83,32 @@ async function anilistQuery(query, variables = {}) {
       throw new Error(`AniList GraphQL errors: ${msg}`);
     }
 
+    // Proactively sleep if we're close to the rate limit
+    const remaining = parseInt(res.headers.get('x-ratelimit-remaining'), 10);
+    const resetAt = parseInt(res.headers.get('x-ratelimit-reset'), 10);
+    if (!isNaN(remaining) && remaining < 10 && !isNaN(resetAt)) {
+      const waitMs = Math.max(0, resetAt * 1000 - Date.now()) + 500;
+      logger.debug(`AniList rate limit low (${remaining} left). Sleeping ${Math.round(waitMs / 1000)}s until reset`);
+      await sleep(waitMs);
+    }
+
     return json.data;
   }
 
   throw new Error('AniList API: max retries exceeded');
+}
+
+/**
+ * Execute a GraphQL query against AniList via the serial queue.
+ * AniList allows ~90 requests/min. The queue drains one at a time and
+ * proactively sleeps when the rate-limit window is nearly exhausted.
+ *
+ * @param {string} query   - GraphQL query string
+ * @param {object} variables
+ * @returns {Promise<object>} - parsed data object
+ */
+async function anilistQuery(query, variables = {}) {
+  return enqueue(query, variables);
 }
 
 /**

@@ -2,8 +2,6 @@
 
 const fetch = require('node-fetch');
 const logger = require('../utils/logger');
-const sleep = require('../utils/sleep');
-
 const TMDB_API   = 'https://api.themoviedb.org/3';
 const TMDB_IMG   = 'https://image.tmdb.org/t/p';
 
@@ -65,26 +63,33 @@ async function fetchTmdbSeason(tmdbId, seasonNum) {
  * @returns {Promise<Array>}
  */
 async function fetchTmdbAllEpisodes(tmdbId, numSeasons) {
+  // Fetch all seasons in parallel (regular 1..N + specials 0)
+  const seasonNums = [];
+  for (let s = 1; s <= numSeasons; s++) seasonNums.push(s);
+  seasonNums.push(0); // specials last
+
+  const results = await Promise.all(
+    seasonNums.map(s => fetchTmdbSeason(tmdbId, s).then(season => ({ s, season })))
+  );
+
   const allEpisodes = [];
 
-  // Regular seasons first
-  for (let s = 1; s <= numSeasons; s++) {
-    const season = await fetchTmdbSeason(tmdbId, s);
+  // Regular seasons first (1..N), then season 0 (specials) — preserves original ordering
+  for (const { s, season } of results) {
+    if (s === 0) continue; // handle specials after
     if (season && Array.isArray(season.episodes)) {
       for (const ep of season.episodes) {
         allEpisodes.push({ ...ep, season_number: s });
       }
     }
-    await sleep(150); // stay well within TMDB rate limit
   }
 
-  // Season 0 = specials/OVAs — append last so Stremio lists "Special" below Season N
-  const specials = await fetchTmdbSeason(tmdbId, 0);
-  if (specials && Array.isArray(specials.episodes) && specials.episodes.length > 0) {
-    for (const ep of specials.episodes) {
+  // Append specials last so Stremio lists "Special" below Season N
+  const specialsResult = results.find(r => r.s === 0);
+  if (specialsResult && specialsResult.season && Array.isArray(specialsResult.season.episodes) && specialsResult.season.episodes.length > 0) {
+    for (const ep of specialsResult.season.episodes) {
       allEpisodes.push({ ...ep, season_number: 0 });
     }
-    await sleep(150);
   }
 
   return allEpisodes;
